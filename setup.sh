@@ -34,6 +34,7 @@ if [ -z "$PYTHON_BIN" ]; then
     echo "    Please install Python 3.10+:"
     echo "      - macOS: brew install python"
     echo "      - Ubuntu/Debian: sudo apt install python3 python3-venv python3-pip"
+    echo "      - ChromeOS (Crostini): sudo apt install python3 python3-venv python3-pip libgl1-mesa-dri"
     echo "      - Fedora: sudo dnf install python3 python3-pip"
     exit 1
 fi
@@ -74,6 +75,7 @@ if [ "$BLENDER_FOUND" = false ]; then
         echo "      macOS: brew install blender (or download from https://www.blender.org)"
     else
         echo "      Ubuntu/Debian: sudo apt install blender (or flatpak install org.blender.Blender)"
+        echo "      ChromeOS (Crostini): sudo apt install blender libgl1-mesa-dri"
         echo "      Fedora: sudo dnf install blender"
     fi
     echo "    (You can also specify a custom path in config.yaml under 'blender.custom_path')"

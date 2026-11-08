@@ -122,6 +122,16 @@ import math
 import mathutils
 import mathutils.noise
 import random
+import sys
+import traceback
+
+def _unhandled_exception(exc_type, exc_value, exc_traceback):
+    sys.stderr.write("FATAL BLENDER PYTHON ERROR:\\n")
+    traceback.print_exception(exc_type, exc_value, exc_traceback, file=sys.stderr)
+    sys.stderr.flush()
+    sys.exit(1)
+
+sys.excepthook = _unhandled_exception
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 
@@ -5838,314 +5848,437 @@ if needs_layer_comp or needs_engine_bloom or fx_mode in (
     "bloom_glare", "lens_flare", "lens_distortion", "color_grading",
     "film_grain", "fog_mist", "volumetric_shafts"
 ):
-    if needs_layer_comp:
-        scene.render.film_transparent = True
-        vl_bg = scene.view_layers[0]
-        vl_bg.name = "VL_Background"
-        vl_bg.use_pass_z = True
-        for lc in vl_bg.layer_collection.children:
-            if lc.name == "Foreground":
-                lc.exclude = True
-        vl_fg = scene.view_layers.new(name="VL_Foreground")
-        vl_fg.use_pass_z = True
-        for lc in vl_fg.layer_collection.children:
-            if lc.name == "Celestial":
-                lc.exclude = True
+    try:
+        if needs_layer_comp:
+            scene.render.film_transparent = True
+            vl_bg = scene.view_layers[0]
+            vl_bg.name = "VL_Background"
+            vl_bg.use_pass_z = True
+            for lc in vl_bg.layer_collection.children:
+                if lc.name == "Foreground":
+                    lc.exclude = True
+            vl_fg = scene.view_layers.new(name="VL_Foreground")
+            vl_fg.use_pass_z = True
+            for lc in vl_fg.layer_collection.children:
+                if lc.name == "Celestial":
+                    lc.exclude = True
 
-    scene.render.use_compositing = True
-    ng = bpy.data.node_groups.new("CompFX_" + fx_mode, 'CompositorNodeTree')
-    scene.compositing_node_group = ng
-    ng.interface.new_socket(name='Image', in_out='OUTPUT', socket_type='NodeSocketColor')
-    out_n = ng.nodes.new('NodeGroupOutput')
+        scene.render.use_compositing = True
+        ng = None
+        out_n = None
 
-    if needs_layer_comp:
-        rl_bg = ng.nodes.new('CompositorNodeRLayers')
-        rl_bg.layer = 'VL_Background'
-        rl_fg = ng.nodes.new('CompositorNodeRLayers')
-        rl_fg.layer = 'VL_Foreground'
+        if hasattr(scene, "compositing_node_group"):
+            try:
+                ng = bpy.data.node_groups.new("CompFX_" + fx_mode, 'CompositorNodeTree')
+                scene.compositing_node_group = ng
+                if hasattr(ng, "interface"):
+                    ng.interface.new_socket(name='Image', in_out='OUTPUT', socket_type='NodeSocketColor')
+                elif hasattr(ng, "outputs"):
+                    ng.outputs.new('NodeSocketColor', 'Image')
+                out_n = ng.nodes.new('NodeGroupOutput')
+            except Exception:
+                ng = None
 
-        # Solid black void for deep space
-        alpha_bg = ng.nodes.new('CompositorNodeAlphaOver')
-        alpha_bg.inputs['Background'].default_value = (0.0, 0.0, 0.0, 1.0)
-        ng.links.new(rl_bg.outputs['Image'], alpha_bg.inputs['Foreground'])
+        if ng is None:
+            scene.use_nodes = True
+            ng = scene.node_tree
+            if ng:
+                ng.nodes.clear()
+                out_n = ng.nodes.new('CompositorNodeComposite')
 
-        # Foreground craft rendered over celestial backdrop (eliminates cast shadows on planets)
-        alpha_fg = ng.nodes.new('CompositorNodeAlphaOver')
-        ng.links.new(alpha_bg.outputs['Image'], alpha_fg.inputs['Background'])
-        ng.links.new(rl_fg.outputs['Image'], alpha_fg.inputs['Foreground'])
+        def _safe_glare(node, glare_type='FOG_GLOW', quality='HIGH', threshold=0.25, size=None, iterations=None, color_mod=None, strength=None):
+            if 'Type' in node.inputs:
+                try: node.inputs['Type'].default_value = glare_type
+                except Exception: pass
+            elif hasattr(node, 'glare_type'):
+                type_map = {'Bloom': 'BLOOM', 'Fog Glow': 'FOG_GLOW', 'Streaks': 'STREAKS', 'Ghosts': 'GHOSTS', 'Simple Star': 'SIMPLE_STAR'}
+                gt = type_map.get(glare_type, glare_type.upper().replace(' ', '_'))
+                try:
+                    enum_vals = [e.identifier for e in node.bl_rna.properties['glare_type'].enum_items]
+                    node.glare_type = gt if gt in enum_vals else ('FOG_GLOW' if 'FOG_GLOW' in enum_vals else enum_vals[0])
+                except Exception: pass
 
-        cur_img = alpha_fg.outputs['Image']
-        rl = rl_fg
-    else:
-        rl = ng.nodes.new('CompositorNodeRLayers')
-        cur_img = rl.outputs['Image']
+            if 'Quality' in node.inputs:
+                try: node.inputs['Quality'].default_value = quality
+                except Exception: pass
+            elif hasattr(node, 'quality'):
+                try: node.quality = quality.upper()
+                except Exception: pass
 
-    # Cinematic Multi-Element Anamorphic Lens Flare (Ghosts + Horizontal Streak + Atmospheric Glow)
-    if fx_mode == "lens_flare":
-        g_ghost = ng.nodes.new('CompositorNodeGlare')
-        g_ghost.inputs['Type'].default_value = 'Ghosts'
-        g_ghost.inputs['Quality'].default_value = 'High'
-        g_ghost.inputs['Threshold'].default_value = 0.20
-        g_ghost.inputs['Iterations'].default_value = 4
-        g_ghost.inputs['Color Modulation'].default_value = 0.60
-        g_ghost.inputs['Strength'].default_value = 0.75
-        ng.links.new(cur_img, g_ghost.inputs['Image'])
+            if 'Threshold' in node.inputs:
+                try: node.inputs['Threshold'].default_value = threshold
+                except Exception: pass
+            elif hasattr(node, 'threshold'):
+                try: node.threshold = threshold
+                except Exception: pass
 
-        g_streak = ng.nodes.new('CompositorNodeGlare')
-        g_streak.inputs['Type'].default_value = 'Streaks'
-        g_streak.inputs['Quality'].default_value = 'High'
-        g_streak.inputs['Threshold'].default_value = 0.25
-        g_streak.inputs['Streaks'].default_value = 2
-        g_streak.inputs['Streaks Angle'].default_value = 0.0
-        g_streak.inputs['Fade'].default_value = 0.96
-        g_streak.inputs['Strength'].default_value = 0.85
-        g_streak.inputs['Color Modulation'].default_value = 0.40
-        ng.links.new(g_ghost.outputs['Image'], g_streak.inputs['Image'])
+            if size is not None:
+                if 'Size' in node.inputs:
+                    try: node.inputs['Size'].default_value = size
+                    except Exception: pass
+                elif hasattr(node, 'size'):
+                    try: node.size = int(round(size if size >= 6 else 6 + size * 3))
+                    except Exception: pass
 
-        g_glow = ng.nodes.new('CompositorNodeGlare')
-        g_glow.inputs['Type'].default_value = 'Fog Glow'
-        g_glow.inputs['Quality'].default_value = 'High'
-        g_glow.inputs['Threshold'].default_value = 0.18
-        g_glow.inputs['Strength'].default_value = 0.65
-        g_glow.inputs['Size'].default_value = 0.75
-        ng.links.new(g_streak.outputs['Image'], g_glow.inputs['Image'])
-        cur_img = g_glow.outputs['Image']
+            if iterations is not None:
+                if 'Iterations' in node.inputs:
+                    try: node.inputs['Iterations'].default_value = iterations
+                    except Exception: pass
+                elif hasattr(node, 'iterations'):
+                    try: node.iterations = int(iterations)
+                    except Exception: pass
 
-    # Bloom, Flares & Glow (as demonstrated at point 1m 29s in x.musicvid.json)
-    # Radiates brilliant plasma halos and 6-point lens flare streaks from bright thruster cores
-    elif needs_engine_bloom or fx_mode == "bloom_glare":
-        is_vhs_camcorder = (scene_type == "backrooms") or (
-            scene_type == "story" and story_chapters[min(len(story_chapters) - 1, int(0.5 * (tau_start + tau_end) * len(story_chapters)))] == "backrooms"
-        )
-        if is_vhs_camcorder:
-            # Analog VHS / Hi8 Found-Footage Camcorder Stack:
-            # 1. Fluorescent ceiling Fog Glow halation
+            if color_mod is not None:
+                if 'Color Modulation' in node.inputs:
+                    try: node.inputs['Color Modulation'].default_value = color_mod
+                    except Exception: pass
+                elif hasattr(node, 'color_modulation'):
+                    try: node.color_modulation = color_mod
+                    except Exception: pass
+
+            if strength is not None:
+                if 'Strength' in node.inputs:
+                    try: node.inputs['Strength'].default_value = strength
+                    except Exception: pass
+
+        def _safe_lensdist(node, distortion=0.1, dispersion=0.1, fit=True, jitter=False):
+            if 'Distortion' in node.inputs:
+                try: node.inputs['Distortion'].default_value = distortion
+                except Exception: pass
+            elif 'Distort' in node.inputs:
+                try: node.inputs['Distort'].default_value = distortion
+                except Exception: pass
+
+            if 'Dispersion' in node.inputs:
+                try: node.inputs['Dispersion'].default_value = dispersion
+                except Exception: pass
+
+            if hasattr(node, 'use_fit'):
+                try: node.use_fit = bool(fit)
+                except Exception: pass
+            elif 'Fit' in node.inputs:
+                try: node.inputs['Fit'].default_value = bool(fit)
+                except Exception: pass
+
+            if hasattr(node, 'use_jitter'):
+                try: node.use_jitter = bool(jitter)
+                except Exception: pass
+            elif 'Jitter' in node.inputs:
+                try: node.inputs['Jitter'].default_value = bool(jitter)
+                except Exception: pass
+
+        def _create_mix(ng, blend_type='OVERLAY', fac=0.5):
+            try:
+                mx = ng.nodes.new('ShaderNodeMix')
+                mx.data_type = 'RGBA'
+                mx.blend_type = blend_type
+                mx.inputs[0].default_value = fac
+                return mx, 'shader'
+            except Exception:
+                try:
+                    mx = ng.nodes.new('CompositorNodeMixRGB')
+                    mx.blend_type = blend_type
+                    mx.inputs['Fac'].default_value = fac
+                    return mx, 'comp'
+                except Exception:
+                    return None, None
+
+        def _link_mix(ng, mx, mx_type, img_a, img_b_or_col):
+            if mx_type == 'shader':
+                ng.links.new(img_a, mx.inputs[6])
+                if isinstance(img_b_or_col, tuple):
+                    mx.inputs[7].default_value = img_b_or_col
+                else:
+                    ng.links.new(img_b_or_col, mx.inputs[7])
+                return mx.outputs[2]
+            elif mx_type == 'comp':
+                ng.links.new(img_a, mx.inputs[1])
+                if isinstance(img_b_or_col, tuple):
+                    mx.inputs[2].default_value = img_b_or_col
+                else:
+                    ng.links.new(img_b_or_col, mx.inputs[2])
+                return mx.outputs['Image']
+            return img_a
+
+        if needs_layer_comp:
+            rl_bg = ng.nodes.new('CompositorNodeRLayers')
+            rl_bg.layer = 'VL_Background'
+            rl_fg = ng.nodes.new('CompositorNodeRLayers')
+            rl_fg.layer = 'VL_Foreground'
+
+            # Solid black void for deep space
+            alpha_bg = ng.nodes.new('CompositorNodeAlphaOver')
+            if 'Background' in alpha_bg.inputs:
+                alpha_bg.inputs['Background'].default_value = (0.0, 0.0, 0.0, 1.0)
+                ng.links.new(rl_bg.outputs['Image'], alpha_bg.inputs['Foreground'])
+            else:
+                alpha_bg.inputs[1].default_value = (0.0, 0.0, 0.0, 1.0)
+                ng.links.new(rl_bg.outputs['Image'], alpha_bg.inputs[2])
+
+            # Foreground craft rendered over celestial backdrop (eliminates cast shadows on planets)
+            alpha_fg = ng.nodes.new('CompositorNodeAlphaOver')
+            if 'Background' in alpha_fg.inputs:
+                ng.links.new(alpha_bg.outputs['Image'], alpha_fg.inputs['Background'])
+                ng.links.new(rl_fg.outputs['Image'], alpha_fg.inputs['Foreground'])
+            else:
+                ng.links.new(alpha_bg.outputs['Image'], alpha_fg.inputs[1])
+                ng.links.new(rl_fg.outputs['Image'], alpha_fg.inputs[2])
+
+            cur_img = alpha_fg.outputs['Image']
+            rl = rl_fg
+        else:
+            rl = ng.nodes.new('CompositorNodeRLayers')
+            cur_img = rl.outputs['Image']
+
+        # Cinematic Multi-Element Anamorphic Lens Flare (Ghosts + Horizontal Streak + Atmospheric Glow)
+        if fx_mode == "lens_flare":
+            g_ghost = ng.nodes.new('CompositorNodeGlare')
+            _safe_glare(g_ghost, glare_type='Ghosts', quality='High', threshold=0.20, iterations=4, color_mod=0.60, strength=0.75)
+            ng.links.new(cur_img, g_ghost.inputs['Image'])
+
+            g_streak = ng.nodes.new('CompositorNodeGlare')
+            _safe_glare(g_streak, glare_type='Streaks', quality='High', threshold=0.25, iterations=3, color_mod=0.40, strength=0.85)
+            if 'Streaks' in g_streak.inputs:
+                try: g_streak.inputs['Streaks'].default_value = 2
+                except Exception: pass
+            elif hasattr(g_streak, 'streaks'):
+                try: g_streak.streaks = 2
+                except Exception: pass
+            ng.links.new(g_ghost.outputs['Image'], g_streak.inputs['Image'])
+
             g_glow = ng.nodes.new('CompositorNodeGlare')
-            g_glow.inputs['Type'].default_value = 'Fog Glow'
-            g_glow.inputs['Quality'].default_value = 'High'
-            g_glow.inputs['Threshold'].default_value = 0.28
-            g_glow.inputs['Strength'].default_value = 0.52
-            g_glow.inputs['Size'].default_value = 0.65
-            ng.links.new(cur_img, g_glow.inputs['Image'])
+            _safe_glare(g_glow, glare_type='Fog Glow', quality='High', threshold=0.18, strength=0.65, size=0.75)
+            ng.links.new(g_streak.outputs['Image'], g_glow.inputs['Image'])
             cur_img = g_glow.outputs['Image']
 
-            # 2. Milky lifted VHS black floor & sickly Level-0 fluorescent yellow-green color cast
-            cb = ng.nodes.new('CompositorNodeColorBalance')
-            cb.inputs['Type'].default_value = 'Lift/Gamma/Gain'
-            cb.inputs[4].default_value = (1.03, 1.02, 0.94, 1.0)
-            cb.inputs[6].default_value = (1.06, 1.04, 0.84, 1.0)
-            cb.inputs[8].default_value = (1.04, 1.00, 0.88, 1.0)
-            ng.links.new(cur_img, cb.inputs['Image'])
-            cur_img = cb.outputs['Image']
+        # Bloom, Flares & Glow (as demonstrated at point 1m 29s in x.musicvid.json)
+        # Radiates brilliant plasma halos and 6-point lens flare streaks from bright thruster cores
+        elif needs_engine_bloom or fx_mode == "bloom_glare":
+            is_vhs_camcorder = (scene_type == "backrooms") or (
+                scene_type == "story" and story_chapters[min(len(story_chapters) - 1, int(0.5 * (tau_start + tau_end) * len(story_chapters)))] == "backrooms"
+            )
+            if is_vhs_camcorder:
+                # Analog VHS / Hi8 Found-Footage Camcorder Stack:
+                # 1. Fluorescent ceiling Fog Glow halation
+                g_glow = ng.nodes.new('CompositorNodeGlare')
+                _safe_glare(g_glow, glare_type='Fog Glow', quality='High', threshold=0.28, strength=0.52, size=0.65)
+                ng.links.new(cur_img, g_glow.inputs['Image'])
+                cur_img = g_glow.outputs['Image']
 
-            # 3. Animated 4D VHS magnetic tape noise & grain
-            ic = ng.nodes.new('CompositorNodeImageCoordinates')
-            tn_vhs = ng.nodes.new('ShaderNodeTexNoise')
-            tn_vhs.noise_dimensions = '4D'
-            tn_vhs.inputs['Scale'].default_value = 460.0
-            tn_vhs.inputs['Detail'].default_value = 4.0
-            tn_vhs.inputs['Roughness'].default_value = 0.88
-            tn_vhs.inputs['W'].default_value = 0.0
-            tn_vhs.inputs['W'].keyframe_insert('default_value', frame=1)
-            tn_vhs.inputs['W'].default_value = 26.0
-            tn_vhs.inputs['W'].keyframe_insert('default_value', frame=total_f)
-            ng.links.new(ic.outputs['Uniform'], tn_vhs.inputs['Vector'])
+                # 2. Milky lifted VHS black floor & sickly Level-0 fluorescent yellow-green color cast
+                try:
+                    cb = ng.nodes.new('CompositorNodeColorBalance')
+                    if hasattr(cb, 'correction_method'):
+                        cb.correction_method = 'LIFT_GAMMA_GAIN'
+                    for idx, val in [(4, (1.03, 1.02, 0.94, 1.0)), (6, (1.06, 1.04, 0.84, 1.0)), (8, (1.04, 1.00, 0.88, 1.0))]:
+                        if idx < len(cb.inputs):
+                            cb.inputs[idx].default_value = val
+                    ng.links.new(cur_img, cb.inputs['Image'])
+                    cur_img = cb.outputs['Image']
+                except Exception:
+                    pass
 
-            mx_vhs = ng.nodes.new('ShaderNodeMix')
-            mx_vhs.data_type = 'RGBA'
-            mx_vhs.blend_type = 'OVERLAY'
-            mx_vhs.inputs[0].default_value = 0.26
-            ng.links.new(cur_img, mx_vhs.inputs[6])
-            ng.links.new(tn_vhs.outputs['Color'], mx_vhs.inputs[7])
-            cur_img = mx_vhs.outputs[2]
+                # 3. Animated 4D VHS magnetic tape noise & grain
+                try:
+                    ic = ng.nodes.new('CompositorNodeImageCoordinates')
+                    tn_vhs = ng.nodes.new('ShaderNodeTexNoise')
+                    tn_vhs.noise_dimensions = '4D'
+                    tn_vhs.inputs['Scale'].default_value = 460.0
+                    tn_vhs.inputs['Detail'].default_value = 4.0
+                    tn_vhs.inputs['Roughness'].default_value = 0.88
+                    tn_vhs.inputs['W'].default_value = 0.0
+                    tn_vhs.inputs['W'].keyframe_insert('default_value', frame=1)
+                    tn_vhs.inputs['W'].default_value = 26.0
+                    tn_vhs.inputs['W'].keyframe_insert('default_value', frame=total_f)
+                    ng.links.new(ic.outputs['Uniform'], tn_vhs.inputs['Vector'])
 
-            # 4. Wide-angle camcorder barrel lens curvature + VHS RGB color-channel bleed & optical jitter
-            ld = ng.nodes.new('CompositorNodeLensdist')
-            ld.inputs['Type'].default_value = 'Radial'
-            ld.inputs['Distortion'].default_value = 0.14
-            ld.inputs['Dispersion'].default_value = 0.16
-            ld.inputs['Jitter'].default_value = True
-            ld.inputs['Fit'].default_value = True
-            ng.links.new(cur_img, ld.inputs['Image'])
-            cur_img = ld.outputs['Image']
-        elif scene_type == "vector_arcade":
-            # CRT Vector Monitor: Gentle phosphor glow + CRT barrel lens curvature (no photographic 6-point glare)
-            g_bloom = ng.nodes.new('CompositorNodeGlare')
-            g_bloom.inputs['Type'].default_value = 'Bloom'
-            g_bloom.inputs['Quality'].default_value = 'High'
-            g_bloom.inputs['Threshold'].default_value = 0.35
-            g_bloom.inputs['Strength'].default_value = 0.38
-            g_bloom.inputs['Size'].default_value = 0.45
-            ng.links.new(cur_img, g_bloom.inputs['Image'])
-            cur_img = g_bloom.outputs['Image']
+                    mx_node, mx_type = _create_mix(ng, 'OVERLAY', 0.26)
+                    if mx_node:
+                        cur_img = _link_mix(ng, mx_node, mx_type, cur_img, tn_vhs.outputs['Color'])
+                except Exception:
+                    pass
 
-            ld = ng.nodes.new('CompositorNodeLensdist')
-            ld.inputs['Type'].default_value = 'Radial'
-            ld.inputs['Distortion'].default_value = 0.10
-            ld.inputs['Dispersion'].default_value = 0.03
-            ld.inputs['Fit'].default_value = True
-            ng.links.new(cur_img, ld.inputs['Image'])
-            cur_img = ld.outputs['Image']
-        else:
-            g_bloom = ng.nodes.new('CompositorNodeGlare')
-            g_bloom.inputs['Type'].default_value = 'Bloom'
-            g_bloom.inputs['Quality'].default_value = 'High'
-            g_bloom.inputs['Threshold'].default_value = 0.15
-            g_bloom.inputs['Strength'].default_value = 0.90
-            g_bloom.inputs['Size'].default_value = 0.65
-            ng.links.new(cur_img, g_bloom.inputs['Image'])
-
-            g_flare = ng.nodes.new('CompositorNodeGlare')
-            g_flare.inputs['Type'].default_value = 'Streaks'
-            g_flare.inputs['Quality'].default_value = 'High'
-            g_flare.inputs['Threshold'].default_value = 0.32
-            g_flare.inputs['Streaks'].default_value = 6
-            g_flare.inputs['Streaks Angle'].default_value = 0.42
-            g_flare.inputs['Strength'].default_value = 0.75
-            g_flare.inputs['Color Modulation'].default_value = 0.35
-            ng.links.new(g_bloom.outputs['Image'], g_flare.inputs['Image'])
-            cur_img = g_flare.outputs['Image']
-
-            if scene_type == "trippy":
+                # 4. Wide-angle camcorder barrel lens curvature + VHS RGB color-channel bleed & optical jitter
                 ld = ng.nodes.new('CompositorNodeLensdist')
-                ld.inputs['Type'].default_value = 'Radial'
-                ld.inputs['Distortion'].default_value = 0.04
-                ld.inputs['Dispersion'].default_value = 0.09
-                ld.inputs['Fit'].default_value = True
+                _safe_lensdist(ld, distortion=0.14, dispersion=0.16, fit=True, jitter=True)
                 ng.links.new(cur_img, ld.inputs['Image'])
                 cur_img = ld.outputs['Image']
 
-    if fx_mode == "lens_distortion":
-        # Lens Distortion & Dispersion
-        ld = ng.nodes.new('CompositorNodeLensdist')
-        ld.inputs['Type'].default_value = 'Radial'
-        ld.inputs['Distortion'].default_value = 0.26
-        ld.inputs['Dispersion'].default_value = 0.22
-        ld.inputs['Fit'].default_value = True
-        ng.links.new(cur_img, ld.inputs['Image'])
-        cur_img = ld.outputs['Image']
+            elif scene_type == "vector_arcade":
+                # CRT Vector Monitor: Gentle phosphor glow + CRT barrel lens curvature (no photographic 6-point glare)
+                g_bloom = ng.nodes.new('CompositorNodeGlare')
+                _safe_glare(g_bloom, glare_type='Bloom', quality='High', threshold=0.35, strength=0.38, size=0.45)
+                ng.links.new(cur_img, g_bloom.inputs['Image'])
+                cur_img = g_bloom.outputs['Image']
 
-    elif fx_mode == "color_grading":
-        # Color Grading & Tone Mapping
-        tm = ng.nodes.new('CompositorNodeTonemap')
-        tm.inputs['Type'].default_value = 'R/D Photoreceptor'
-        tm.inputs['Intensity'].default_value = 0.35
-        tm.inputs['Contrast'].default_value = 0.38
-        tm.inputs['Chromatic Adaptation'].default_value = 0.55
-        ng.links.new(cur_img, tm.inputs['Image'])
+                ld = ng.nodes.new('CompositorNodeLensdist')
+                _safe_lensdist(ld, distortion=0.10, dispersion=0.03, fit=True)
+                ng.links.new(cur_img, ld.inputs['Image'])
+                cur_img = ld.outputs['Image']
 
-        cb = ng.nodes.new('CompositorNodeColorBalance')
-        cb.inputs['Type'].default_value = 'Lift/Gamma/Gain'
-        cb.inputs[4].default_value = (0.82, 0.95, 1.18, 1.0)
-        cb.inputs[6].default_value = (1.10, 0.96, 0.86, 1.0)
-        cb.inputs[8].default_value = (1.25, 1.06, 0.88, 1.0)
-        ng.links.new(tm.outputs['Image'], cb.inputs['Image'])
-        cur_img = cb.outputs['Image']
+            else:
+                g_bloom = ng.nodes.new('CompositorNodeGlare')
+                _safe_glare(g_bloom, glare_type='Bloom', quality='High', threshold=0.15, strength=0.90, size=0.65)
+                ng.links.new(cur_img, g_bloom.inputs['Image'])
 
-    elif fx_mode == "film_grain":
-        # Film Grain (animated 4D procedural noise + optical jitter)
-        ic = ng.nodes.new('CompositorNodeImageCoordinates')
-        tn = ng.nodes.new('ShaderNodeTexNoise')
-        tn.noise_dimensions = '4D'
-        tn.inputs['Scale'].default_value = 520.0
-        tn.inputs['Detail'].default_value = 4.0
-        tn.inputs['Roughness'].default_value = 0.90
-        tn.inputs['W'].default_value = 0.0
-        tn.inputs['W'].keyframe_insert('default_value', frame=1)
-        tn.inputs['W'].default_value = 24.0
-        tn.inputs['W'].keyframe_insert('default_value', frame=total_f)
-        ng.links.new(ic.outputs['Uniform'], tn.inputs['Vector'])
+                g_flare = ng.nodes.new('CompositorNodeGlare')
+                _safe_glare(g_flare, glare_type='Streaks', quality='High', threshold=0.32, strength=0.75, color_mod=0.35)
+                if 'Streaks' in g_flare.inputs:
+                    try: g_flare.inputs['Streaks'].default_value = 6
+                    except Exception: pass
+                elif hasattr(g_flare, 'streaks'):
+                    try: g_flare.streaks = 6
+                    except Exception: pass
+                ng.links.new(g_bloom.outputs['Image'], g_flare.inputs['Image'])
+                cur_img = g_flare.outputs['Image']
 
-        mx = ng.nodes.new('ShaderNodeMix')
-        mx.data_type = 'RGBA'
-        mx.blend_type = 'OVERLAY'
-        mx.inputs[0].default_value = 0.36
-        ng.links.new(cur_img, mx.inputs[6])
-        ng.links.new(tn.outputs['Color'], mx.inputs[7])
+                if scene_type == "trippy":
+                    ld = ng.nodes.new('CompositorNodeLensdist')
+                    _safe_lensdist(ld, distortion=0.04, dispersion=0.09, fit=True)
+                    ng.links.new(cur_img, ld.inputs['Image'])
+                    cur_img = ld.outputs['Image']
 
-        ld = ng.nodes.new('CompositorNodeLensdist')
-        ld.inputs['Distortion'].default_value = 0.015
-        ld.inputs['Dispersion'].default_value = 0.025
-        ld.inputs['Jitter'].default_value = True
-        ld.inputs['Fit'].default_value = True
-        ng.links.new(mx.outputs[2], ld.inputs['Image'])
-        cur_img = ld.outputs['Image']
+        if fx_mode == "lens_distortion":
+            # Lens Distortion & Dispersion
+            ld = ng.nodes.new('CompositorNodeLensdist')
+            _safe_lensdist(ld, distortion=0.26, dispersion=0.22, fit=True)
+            ng.links.new(cur_img, ld.inputs['Image'])
+            cur_img = ld.outputs['Image']
 
-    elif fx_mode == "fog_mist":
-        # Subtle Volumetric & Atmospheric Fog, Mist & Haze (gentle Z-depth haze + soft Fog Glow)
-        mr = ng.nodes.new('ShaderNodeMapRange')
-        mr.inputs['From Min'].default_value = 10.0
-        mr.inputs['From Max'].default_value = 55.0
-        mr.inputs['To Min'].default_value = 0.0
-        mr.inputs['To Max'].default_value = 0.08
-        if 'Depth' in rl.outputs:
-            ng.links.new(rl.outputs['Depth'], mr.inputs['Value'])
+        elif fx_mode == "color_grading":
+            # Color Grading & Tone Mapping
+            try:
+                tm = ng.nodes.new('CompositorNodeTonemap')
+                if 'Type' in tm.inputs:
+                    try: tm.inputs['Type'].default_value = 'R/D Photoreceptor'
+                    except Exception: pass
+                elif hasattr(tm, 'tonemap_type'):
+                    try: tm.tonemap_type = 'RD_PHOTORECEPTOR'
+                    except Exception: pass
+                for name, val in [('Intensity', 0.35), ('Contrast', 0.38), ('Chromatic Adaptation', 0.55)]:
+                    if name in tm.inputs:
+                        try: tm.inputs[name].default_value = val
+                        except Exception: pass
+                ng.links.new(cur_img, tm.inputs['Image'])
+                cur_img = tm.outputs['Image']
+            except Exception:
+                pass
 
-        fg = ng.nodes.new('CompositorNodeGlare')
-        fg.inputs['Type'].default_value = 'Fog Glow'
-        fg.inputs['Quality'].default_value = 'High'
-        fg.inputs['Threshold'].default_value = 0.35
-        fg.inputs['Strength'].default_value = 0.28
-        fg.inputs['Size'].default_value = 0.50
-        ng.links.new(cur_img, fg.inputs['Image'])
+            try:
+                cb = ng.nodes.new('CompositorNodeColorBalance')
+                if hasattr(cb, 'correction_method'):
+                    cb.correction_method = 'LIFT_GAMMA_GAIN'
+                for idx, val in [(4, (0.82, 0.95, 1.18, 1.0)), (6, (1.10, 0.96, 0.86, 1.0)), (8, (1.25, 1.06, 0.88, 1.0))]:
+                    if idx < len(cb.inputs):
+                        cb.inputs[idx].default_value = val
+                ng.links.new(cur_img, cb.inputs['Image'])
+                cur_img = cb.outputs['Image']
+            except Exception:
+                pass
 
-        mx = ng.nodes.new('ShaderNodeMix')
-        mx.data_type = 'RGBA'
-        mx.blend_type = 'SCREEN'
-        mx.inputs[7].default_value = (0.015, 0.045, 0.09, 1.0)
-        ng.links.new(mr.outputs['Result'], mx.inputs[0])
-        ng.links.new(fg.outputs['Image'], mx.inputs[6])
-        cur_img = mx.outputs[2]
+        elif fx_mode == "film_grain":
+            # Film Grain (animated 4D procedural noise + optical jitter)
+            try:
+                ic = ng.nodes.new('CompositorNodeImageCoordinates')
+                tn = ng.nodes.new('ShaderNodeTexNoise')
+                tn.noise_dimensions = '4D'
+                tn.inputs['Scale'].default_value = 520.0
+                tn.inputs['Detail'].default_value = 4.0
+                tn.inputs['Roughness'].default_value = 0.90
+                tn.inputs['W'].default_value = 0.0
+                tn.inputs['W'].keyframe_insert('default_value', frame=1)
+                tn.inputs['W'].default_value = 24.0
+                tn.inputs['W'].keyframe_insert('default_value', frame=total_f)
+                ng.links.new(ic.outputs['Uniform'], tn.inputs['Vector'])
 
-    elif fx_mode == "volumetric_shafts":
-        if scene_type == "landscape":
-            # For 3D landscape scenes, physical 3D suns exist in the sky behind any planets.
-            # Glare / Sun Beams are derived directly from the rendered 3D scene (cur_img)
-            # without a 2D screen overlay, allowing foreground terrain & planets to naturally occlude the light!
-            sb = ng.nodes.new('CompositorNodeGlare')
-            sb.inputs['Type'].default_value = 'Sun Beams'
-            sb.inputs['Quality'].default_value = 'High'
-            sb.inputs['Threshold'].default_value = 0.35
-            sb.inputs['Strength'].default_value = 0.38
-            sb.inputs['Size'].default_value = 0.50
-            sb.inputs['Sun Position'].default_value = (0.54, 0.70)
-            ng.links.new(cur_img, sb.inputs['Image'])
-            cur_img = sb.outputs['Image']
-        else:
-            # Volumetric Light Shafts (crepuscular Sun Beams radiating from the upper sky)
-            # Positioned in the upper atmosphere (Y = 0.82, well above 50% horizon line)
-            # so god-rays radiate downward across the scene without blinding the center screen or HUD
-            em = ng.nodes.new('CompositorNodeEllipseMask')
-            em.inputs['Position'].default_value = (0.52, 0.82)
-            em.inputs['Size'].default_value = (0.07, 0.07)
-            bl = ng.nodes.new('CompositorNodeBlur')
-            bl.inputs['Size'].default_value = (24.0, 24.0)
-            ng.links.new(em.outputs['Mask'], bl.inputs['Image'])
+                mx_node, mx_type = _create_mix(ng, 'OVERLAY', 0.36)
+                if mx_node:
+                    cur_img = _link_mix(ng, mx_node, mx_type, cur_img, tn.outputs['Color'])
+            except Exception:
+                pass
 
-            mx = ng.nodes.new('ShaderNodeMix')
-            mx.data_type = 'RGBA'
-            mx.blend_type = 'SCREEN'
-            mx.inputs[7].default_value = (0.75, 0.88, 1.0, 0.60)
-            ng.links.new(bl.outputs['Image'], mx.inputs[0])
-            ng.links.new(cur_img, mx.inputs[6])
+            ld = ng.nodes.new('CompositorNodeLensdist')
+            _safe_lensdist(ld, distortion=0.015, dispersion=0.025, fit=True, jitter=True)
+            ng.links.new(cur_img, ld.inputs['Image'])
+            cur_img = ld.outputs['Image']
 
-            sb = ng.nodes.new('CompositorNodeGlare')
-            sb.inputs['Type'].default_value = 'Sun Beams'
-            sb.inputs['Quality'].default_value = 'High'
-            sb.inputs['Threshold'].default_value = 0.22
-            sb.inputs['Strength'].default_value = 0.45
-            sb.inputs['Size'].default_value = 0.65
-            sb.inputs['Sun Position'].default_value = (0.52, 0.82)
-            ng.links.new(mx.outputs[2], sb.inputs['Image'])
-            cur_img = sb.outputs['Image']
+        elif fx_mode == "fog_mist":
+            # Subtle Volumetric & Atmospheric Fog, Mist & Haze (gentle Z-depth haze + soft Fog Glow)
+            try:
+                mr = ng.nodes.new('CompositorNodeMapRange') if hasattr(bpy.types, 'CompositorNodeMapRange') else ng.nodes.new('ShaderNodeMapRange')
+                if 'From Min' in mr.inputs: mr.inputs['From Min'].default_value = 10.0
+                if 'From Max' in mr.inputs: mr.inputs['From Max'].default_value = 55.0
+                if 'To Min' in mr.inputs: mr.inputs['To Min'].default_value = 0.0
+                if 'To Max' in mr.inputs: mr.inputs['To Max'].default_value = 0.08
+                if 'Depth' in rl.outputs:
+                    ng.links.new(rl.outputs['Depth'], mr.inputs[0])
 
-    ng.links.new(cur_img, out_n.inputs['Image'])
+                fg = ng.nodes.new('CompositorNodeGlare')
+                _safe_glare(fg, glare_type='Fog Glow', quality='High', threshold=0.35, strength=0.28, size=0.50)
+                ng.links.new(cur_img, fg.inputs['Image'])
+
+                mx_node, mx_type = _create_mix(ng, 'SCREEN', 0.5)
+                if mx_node:
+                    cur_img = _link_mix(ng, mx_node, mx_type, fg.outputs['Image'], (0.015, 0.045, 0.09, 1.0))
+            except Exception:
+                pass
+
+        elif fx_mode == "volumetric_shafts":
+            if scene_type == "landscape":
+                sb = ng.nodes.new('CompositorNodeGlare')
+                _safe_glare(sb, glare_type='Streaks', quality='High', threshold=0.35, strength=0.38, size=0.50)
+                ng.links.new(cur_img, sb.inputs['Image'])
+                cur_img = sb.outputs['Image']
+            else:
+                try:
+                    em = ng.nodes.new('CompositorNodeEllipseMask')
+                    if 'Position' in em.inputs: em.inputs['Position'].default_value = (0.52, 0.82)
+                    if 'Size' in em.inputs: em.inputs['Size'].default_value = (0.07, 0.07)
+                    bl = ng.nodes.new('CompositorNodeBlur')
+                    if 'Size' in bl.inputs: bl.inputs['Size'].default_value = (24.0, 24.0)
+                    elif hasattr(bl, 'size_x'):
+                        bl.size_x = 24
+                        bl.size_y = 24
+                    ng.links.new(em.outputs[0], bl.inputs['Image'])
+
+                    mx_node, mx_type = _create_mix(ng, 'SCREEN', 0.5)
+                    if mx_node:
+                        cur_img = _link_mix(ng, mx_node, mx_type, cur_img, (0.75, 0.88, 1.0, 0.60))
+
+                    sb = ng.nodes.new('CompositorNodeGlare')
+                    _safe_glare(sb, glare_type='Streaks', quality='High', threshold=0.22, strength=0.45, size=0.65)
+                    ng.links.new(cur_img, sb.inputs['Image'])
+                    cur_img = sb.outputs['Image']
+                except Exception:
+                    pass
+
+        if out_n and 'Image' in out_n.inputs:
+            ng.links.new(cur_img, out_n.inputs['Image'])
+    except Exception as comp_err:
+        print(f"Warning: Compositing FX setup encountered an error ({comp_err}), falling back to direct render layer.")
+        try:
+            if ng is not None:
+                ng.nodes.clear()
+                rl_fb = ng.nodes.new('CompositorNodeRLayers')
+                if hasattr(scene, "compositing_node_group") and out_n and getattr(out_n, 'type', '') == 'GROUP_OUTPUT':
+                    out_n = ng.nodes.new('NodeGroupOutput')
+                else:
+                    out_n = ng.nodes.new('CompositorNodeComposite')
+                ng.links.new(rl_fb.outputs['Image'], out_n.inputs['Image'])
+        except Exception as comp_err2:
+            print(f"Warning: Direct composite fallback also failed ({comp_err2}). Disabling compositing.")
+            scene.render.use_compositing = False
 
 # Fast uncompressed PNG output compiled by FFmpeg
 scene.render.image_settings.file_format = 'PNG'
 scene.render.image_settings.compression = 0
 scene.render.filepath = "{frames_dir}/f_"
-bpy.ops.render.render(animation=True)
+try:
+    bpy.ops.render.render(animation=True)
+except Exception as e:
+    sys.stderr.write(f"FATAL: bpy.ops.render.render failed: {e}\\n")
+    traceback.print_exc()
+    sys.exit(1)
 '''
     return script
 
@@ -6166,6 +6299,7 @@ def _execute_blender_process(cmd, env, total_frames, phase_label="3D GPU"):
     last_frame = 0
     last_report_time = 0.0
     is_tty = sys.stdout.isatty()
+    has_traceback = False
 
     frame_re = re.compile(r"f_(\d+)\.png|Append frame (\d+)|Fra:(\d+)")
 
@@ -6181,8 +6315,11 @@ def _execute_blender_process(cmd, env, total_frames, phase_label="3D GPU"):
 
     try:
         for line in iter(proc.stdout.readline, ""):
-            recent_lines.append(line.rstrip())
-            m = frame_re.search(line)
+            stripped = line.rstrip()
+            recent_lines.append(stripped)
+            if any(err_kw in stripped for err_kw in ("Traceback (most recent call last):", "Error: Python:", "FATAL BLENDER")):
+                has_traceback = True
+            m = frame_re.search(stripped)
             if m:
                 f_num = int(m.group(1) or m.group(2) or m.group(3))
                 if f_num > last_frame:
@@ -6204,16 +6341,19 @@ def _execute_blender_process(cmd, env, total_frames, phase_label="3D GPU"):
         raise
 
     elapsed = time.time() - start_time
-    if proc.returncode == 0:
+    is_success = (proc.returncode == 0) and not has_traceback and (last_frame >= total_frames)
+
+    if is_success:
         if is_tty:
             print(f"\r    [{phase_label}] Finished {total_frames}/{total_frames} frames in {elapsed:.1f}s.        ", flush=True)
         else:
             print(f"    [{phase_label}] Finished {total_frames}/{total_frames} frames in {elapsed:.1f}s.", flush=True)
+        return 0, "\n".join(recent_lines)
     else:
         if is_tty:
             print()
-
-    return proc.returncode, "\n".join(recent_lines)
+        exit_code = proc.returncode if proc.returncode != 0 else 1
+        return exit_code, "\n".join(recent_lines)
 
 def render_blender_clip(theme_name, clip_index, out_mp4_path, width=1920, height=1080, fps=30, duration=16.0, blender_fx="none", seed=0, tau_start=0.0, tau_end=1.0):
     """Renders a procedural 3D clip using headless Blender and compiles to MP4."""
@@ -6285,9 +6425,19 @@ def render_blender_clip(theme_name, clip_index, out_mp4_path, width=1920, height
         res_code, out_tail = _execute_blender_process(sw_cmd, sw_env, total_frames, phase_label="3D Software Fallback")
 
     if res_code != 0:
-        shutil.rmtree(temp_dir, ignore_errors=True)
+        print(f"    [!] Debug render directory preserved: {temp_dir}")
         out_tail_tail = "\n".join(out_tail.splitlines()[-35:]) if out_tail else "No output"
         raise RuntimeError(f"Blender render failed (exit code {res_code}):\n{out_tail_tail}")
+
+    # Verify that PNG frames were actually generated
+    rendered_frames = [f for f in os.listdir(temp_dir) if f.startswith("f_") and f.endswith(".png")]
+    if not rendered_frames:
+        print(f"    [!] Debug render directory preserved: {temp_dir}")
+        out_tail_tail = "\n".join(out_tail.splitlines()[-35:]) if out_tail else "No output"
+        raise RuntimeError(
+            f"Blender completed without generating frames in {temp_dir}.\n"
+            f"Recent Blender log output:\n{out_tail_tail}"
+        )
 
     # 2. Compile PNG frames to MP4 using FFmpeg
     ffmpeg_cmd = [
@@ -6295,6 +6445,7 @@ def render_blender_clip(theme_name, clip_index, out_mp4_path, width=1920, height
         "-loglevel", "error",
         "-threads", "2",
         "-framerate", str(fps),
+        "-start_number", "1",
         "-i", os.path.join(temp_dir, "f_%04d.png"),
         "-c:v", "libx264",
         "-r", str(fps),
@@ -6304,9 +6455,12 @@ def render_blender_clip(theme_name, clip_index, out_mp4_path, width=1920, height
         out_mp4_path
     ]
     fres = subprocess.run(ffmpeg_cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
-    shutil.rmtree(temp_dir, ignore_errors=True)
 
-    if fres.returncode == 0 and os.path.exists(out_mp4_path):
+    if fres.returncode == 0 and os.path.exists(out_mp4_path) and os.path.getsize(out_mp4_path) > 0:
+        shutil.rmtree(temp_dir, ignore_errors=True)
         return out_mp4_path
+
+    # On failure, preserve temp_dir for inspection
+    print(f"    [!] Preserved debug render directory: {temp_dir}")
     err_tail = fres.stderr.strip() if fres.stderr else "Unknown error"
     raise RuntimeError(f"FFmpeg failed to compile Blender frames to {out_mp4_path}:\n{err_tail}")

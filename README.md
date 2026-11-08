@@ -73,6 +73,28 @@ Whether you are on **macOS**, **Windows**, or **Linux**, getting started takes l
 
 ---
 
+### ChromeOS (Chromebook / Debian Crostini)
+
+1. **Enable Linux**:
+   * Open ChromeOS **Settings** > **Advanced** > **Developers** > **Linux development environment** and turn it on.
+2. **Install Prerequisites**:
+   ```bash
+   sudo apt update && sudo apt install -y ffmpeg blender python3 python3-venv python3-pip libgl1-mesa-dri
+   ```
+3. **Setup Environment**:
+   ```bash
+   git clone https://github.com/jamesabravo/musicvid.git
+   cd musicvid
+   ./setup.sh
+   ```
+4. **Generate Your First Video**:
+   ```bash
+   ./musicvid -draft -inaudio examples/Skyline.wav -inmidi examples/Skyline.mid -outvideo draft.mp4
+   ```
+   > **Tip for Chromebooks:** Crostini runs virtualized GPU acceleration. If your Chromebook has low RAM or an entry-level CPU, run `-draft` mode first to preview clips in seconds!
+
+---
+
 ## Two-Step Workflow: Draft -> Final
 
 Generating 3D animation at full 1080p can take minutes/hours depending on hardware. To let you iterate in seconds/minutes, `musicvid` uses a two-phase workflow:
