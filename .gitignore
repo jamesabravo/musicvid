@@ -1,0 +1,31 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Packaging
+build/
+dist/
+*.egg-info/
+
+# Rendered output & project cache files
+*.musicvid.json
+*.mp4
+*.mov
+*.mkv
+output/
+.cache/
+
+# OS and Editor files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.vscode/
+.idea/

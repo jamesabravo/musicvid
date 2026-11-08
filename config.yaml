@@ -1,0 +1,146 @@
+# ==============================================================================
+# musicvid Configuration File
+# ==============================================================================
+# All settings can be customized here. Command-line flags override these values.
+
+# Video Generation Defaults
+video:
+  default_resolution: "1920x1080"   # Default resolution for final renders
+  draft_resolution: "320x200"       # Fast low-res resolution for drafts
+  default_fps: 30                   # Final video framerate
+  draft_fps: 15                     # Draft video framerate (fewer frames, faster render)
+  default_genre: "electronic"       # Default genre for rhythm pacing
+  default_themes:                   # Visual themes to cycle through
+    - "space"
+
+# Terminal End Credits
+# Displayed in a monospace retro terminal box at the end of the video.
+terminal_credits:
+  enabled: true
+  start_before_end_sec: 5.0         # Seconds before track end to trigger credits box
+  fade_before_end_sec: 3.0          # Seconds before track end to fade audio and video out
+  text: |
+    ===============================================================
+                        [[YOUR ARTIST NAME]]
+                         "[[YOUR PLAYLIST]]"
+    ===============================================================
+                          [[YOUR DETAILS]]
+                 [[Be kind - keep github URL below]]
+             musicvid utility - https://github.com/aaa/bbb
+    ===============================================================
+                               [ EOF ]
+
+# Blender 3D Engine Settings
+blender:
+  # Optional explicit path to Blender executable. Leave empty to auto-detect.
+  custom_path: ""
+  # Common locations scanned when detecting Blender
+  search_paths:
+    - "blender"
+    - "/Applications/Blender.app/Contents/MacOS/Blender"
+    - "/Applications/Blender.app/Contents/MacOS/blender"
+    - "C:\\Program Files\\Blender Foundation\\Blender 4.3\\blender.exe"
+    - "C:\\Program Files\\Blender Foundation\\Blender 4.2\\blender.exe"
+    - "C:\\Program Files\\Blender Foundation\\Blender 4.1\\blender.exe"
+    - "C:\\Program Files\\Blender Foundation\\Blender 4.0\\blender.exe"
+    - "C:\\Program Files\\Blender Foundation\\Blender 3.6\\blender.exe"
+
+# Visual Effects & Reactive HUD
+effects:
+  shake:
+    enabled: true                   # Kick drum camera shake
+    max_shift_px: 18
+  glitch:
+    enabled: true                   # Snare drum RGB chromatic glitch
+    max_shift_px: 16
+  flash:
+    enabled: true                   # Loudness peak and drop flashes
+    brightness: 0.32
+    contrast: 1.28
+  visualizer:
+    enabled: true                   # Spectrum analyzer and scrolling waveform
+  hud:
+    enabled: true                   # On-screen telemetry and section markers
+
+# ==============================================================================
+# Telemetry & HUD Overlay Text Templates
+# ==============================================================================
+# All text overlays support replaceable tags (e.g. __COORDS__, __RANGE__, __TARGET__, etc.)
+# which are populated with realtime flight and telemetry data.
+overlays:
+  # Planetary Orbital Intercept Telemetry HUD (Corner Box)
+  planet_orbital:
+    header: "[ HUD // NAV-ORBITAL INTERCEPT ]            SYS.STAT: __SYS_STAT__"
+    nav_log_title: "   NAVIGATION LOG & STATUS:"
+    lines:
+      - "   TARGET DESIGNATION : __DESIGNATION__"
+      - "   TARGET CLASS       : __CLASS__"
+      - "   CURRENT VECTOR     : [__COORDS__]"
+      - "   RANGE TO PERIAPSIS : __RANGE__ KM"
+      - "   CLOSURE RATE       : __CLOSURE_RATE__ KM/S __CRATE_LABEL__"
+      - "   __ET_LABEL__: __ET__"
+
+  # Center Flight HUD Visor Displays
+  flight_hud:
+    headers:
+      orbital: "ORBITAL VECTOR LOCKED"
+      descent: "DESCENT TRAJECTORY LOCKED"
+    labels:
+      speed: "SPEED"
+      speed_unit: "KM"
+      thrust: "THRUST"
+      thrust_unit: "M/S"
+      gforces: "G-FORCES"
+      dist: "DIST"
+      dist_unit: "KM"
+
+  # Corner Spaceship Subsystem Telemetry Messages
+  spaceship_telemetry:
+    - "[SYS_BOOT::KERNEL_V8.42.1-EXO] AVIONICS SUBSYSTEM SYNC [__BOOT_MS__ ms]... OK"
+    - "[BUS_CORE] QUANTUM BUS SYNC: __BUS_THZ__ THz // DRIFT: __DRIFT__ ps"
+    - "[PWR_DIST] TOKAMAK FUSION CORE #1: TEMP NOMINAL [__TOK_TEMP__e8 K]"
+    - "[PWR_DIST] MAGNETIC CONTAINMENT FIELD: __MAG_PCT__% STABLE // COIL 4 IMP: __IMP__ mΩ"
+    - "[RCS_STATUS] MONOPROPELLANT MANIFOLD P1–P8 CHARGED (__RCS_BAR__ BAR) // FAULT: NONE"
+    - "[WARP_METRIC] ALCUBIERRE RING ARRAY: STANDBY // CASIMIR VACUUM GAP: __GAP__ nm"
+    - "[WARP_METRIC] TENSOR CURVATURE BIAS: __BIAS__ // EXOTIC FLUX: __FLUX__ mW"
+    - "[NAV_REL] LOCAL FRAME: SOL-3 / HIGH ORBIT // PULSAR LOCK: __PSR_LOCK__ rad"
+    - "[NAV_REL] RELATIVISTIC GAMMA: 1.00000002 // VELOCITY RELATIVE: __VEL__ km/s (ORBITAL)"
+    - "[LIFE_ENV] CABIN ATMOSPHERE: 78.1% N2 | __O2_CAB__% O2 | 0.9% AR (__KPA__ kPa)"
+    - "[LIFE_ENV] SCRUBBER BED 2: REGENERATION COMPLETE // O2 RESERVE: __O2__%"
+    - "[SHIELD_VEC] DEFLECTOR GRID: PHASE-ALIGNED (__PHASE_NM__ nm) // CAPACITY: __SHLD__%"
+    - "[SHIELD_VEC] MICROMETEORITE IMPACT INTERCEPT: __IMPACTS__ DETECTED IN FORWARD CONE"
+    - "[COMMS] SUBSPACE TRANSCEIVER: CARRIER SYNCED // LATENCY TO TERRA: __LAT__ s"
+    - "[COMMS] ENCRYPTION: 4096-BIT QUANTUM LATTICE // KEY ROTATION: __KEY_ROT__ s"
+    - "[DIAG_WARN] RCS THRUSTER 07 MANIFOLD SENSOR DRIFT (__THR_DRIFT__%) -> COMPENSATING"
+    - "[DIAG_WARN] RCS THRUSTER 07 FIRMWARE AUTO-CALIBRATION: PASSED [__CAL_PCT__%]"
+    - "[SYS_STATE] READY FOR TRAJECTORY INJECTION // DELTA-V MARGIN: __DV__ m/s"
+    - "TACTICAL COMBAT ENGAGEMENT MODE // THREAT MATRIX: ACTIVE [__T_LOCK__ LOCKS]"
+    - "TARGET_VEC:   [ X: __TX__m | Y: __TY__m | Z: __TZ__m ]"
+    - "ENGAGEMENT:   HOSTILE CONFIRMED // AUTH CODE: __AUTH_HEX__ // GRANTED"
+    - "ARMAMENT:     RIGHT_FOREARM_STUN_PROD (READY //CAPACITOR: __CAP_V__ kV)"
+    - "RANGE:        __RNG__ METERS // VELOCITY: __CVEL__ m/s CLOSING"
+    - "PROB_HIT:     __PHIT__% (PROJECTED IMPACT POINT: CENTER MASS)"
+    - "COUNTERMEAS:  KINETIC DEFENSE MATRIX CHARGED (__KDM_PCT__%)"
+
+  # Terrain Synthetic Vision System (SVS) & OSD Telemetry Messages
+  terrain_osd:
+    - "[OSD::SVS_NAV] SYNTHETIC VISION LOCK ... OK // RADAR ALTIMETER NOMINAL"
+    - "[ALT_RADAR] AGL: __ALT_AGL__ m // MSL: __ALT_MSL__ m // VERT_VEL: __V_VEL__ m/s"
+    - "[SURVEY_VEC] GROUND_SPD: __SPD_KTS__ KTS // GLIDEPATH: __GLIDE__° // PITCH: __PITCH__°"
+    - "[FRACTAL_LOD] ALGO: HETERO_TERRAIN // OCTAVES: 6 // LACUNARITY: 2.04"
+    - "[MESH_STREAM] VERTICES: 12,800 // RESOLUTION: 1.0 m // CHUNK: SYNCHED"
+    - "[TOPO_SCAN] VALLEY AXIS: S-CURVE ACTIVE // BANK ANGLE: __BANK__°"
+    - "[SVS_SENSOR] FORWARD SCAN RANGE: __SCAN_RNG__ m // VOID HORIZON: BUFFERED"
+    - "[CONTOUR_ID] FORMATION: CANYON GORGE // GEOLOGY: FRACTAL BASALT // EROSION: 0.82"
+    - "[TERRAIN_PROX] MIN CANYON CLEARANCE: __CLEARANCE__ m // PROX WARNING: NONE"
+    - "[HORIZON_REF] ATMOSPHERIC GRADIENT: LOCK // HAZE INDEX: 0.14 // VIS: 45.0 km"
+    - "[NAV_WAYPOINT] CANYON WP-__WP_IDX__ DIST: __WP_DIST__ m // BEARING: __BEARING__°"
+    - "[SVS_STATUS] SYNTHETIC VISION APERTURE: NOMINAL // BUFFER LATENCY: 0.8 ms"
+    - "[GEO_LATTICE] TIKHONOV REGULARIZATION: 1.2e-4 // TOPOLOGICAL MESH: LOCKED"
+    - "[RADAR_TERRAIN] CANYON WALL STARBOARD: __WALL_STBD__ m // PORT: __WALL_PORT__ m"
+    - "[OSD_DIAG] INERTIAL REFERENCE SYSTEM: ZERO DRIFT // ATTITUDE ACCURACY: 0.02°"
+    - "[SVS_VECTOR] TERRAIN FOLLOWING AP: ACTIVE // CONTOUR ENVELOPE: 3.0 m"
+
+# Cache Directory for rendered 3D clips
+paths:
+  cache_dir: "~/.cache/musicvid"

@@ -1,0 +1,16 @@
+services:
+  musicvid:
+    build: .
+    volumes:
+      - ./examples:/data/input:ro
+      - ./output:/data/output
+      - musicvid-cache:/root/.cache/musicvid
+    command: >
+      -draft
+      -inaudio /data/input/Skyline.wav
+      -inmidi /data/input/Skyline.mid
+      -outvideo /data/output/Skyline_draft.mp4
+
+volumes:
+  musicvid-cache:
+

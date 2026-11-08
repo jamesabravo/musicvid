@@ -1,0 +1,29 @@
+#!/usr/bin/env python3
+"""
+musicvid CLI Launcher
+Automatically delegates to a local virtualenv (.venv) if one exists and we are
+not already running within it.
+"""
+import os
+import sys
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
+# If not running in a virtualenv, check if .venv exists locally and re-exec
+in_venv = (sys.prefix != sys.base_prefix) or ("VIRTUAL_ENV" in os.environ)
+if not in_venv:
+    venv_python_unix = os.path.join(current_dir, ".venv", "bin", "python3")
+    venv_python_win = os.path.join(current_dir, ".venv", "Scripts", "python.exe")
+    venv_python = venv_python_unix if os.path.isfile(venv_python_unix) else (
+        venv_python_win if os.path.isfile(venv_python_win) else None
+    )
+    if venv_python and os.access(venv_python, os.X_OK):
+        os.execv(venv_python, [venv_python] + sys.argv)
+
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
+
+from src.main import main
+
+if __name__ == "__main__":
+    main()
