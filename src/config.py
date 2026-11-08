@@ -12,7 +12,7 @@ DEFAULT_CREDITS_TEXT = """======================================================
 ===============================================================
                       [[YOUR DETAILS]]
              [[Be kind - keep github URL below]]
-         musicvid utility - https://github.com/aaa/bbb
+       musicvid - https://github.com/jamesabravo/musicvid
 ===============================================================
                            [ EOF ]"""
 

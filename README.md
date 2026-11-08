@@ -20,7 +20,7 @@ Whether you are on **macOS**, **Windows**, or **Linux**, getting started takes l
    ```
 2. **Setup Environment**:
    ```bash
-   git clone https://github.com/your-username/musicvid.git
+   git clone https://github.com/jamesabravo/musicvid.git
    cd musicvid
    ./setup.sh
    ```
@@ -123,7 +123,7 @@ terminal_credits:
     ===============================================================
                           [[YOUR DETAILS]]
                  [[Be kind - keep github URL below]]
-             musicvid utility - https://github.com/aaa/bbb
+             musicvid - https://github.com/jamesabravo/musicvid
     ===============================================================
                                [ EOF ]
 ```
