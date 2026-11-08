@@ -5891,7 +5891,7 @@ if needs_layer_comp or needs_engine_bloom or fx_mode in (
                 try: node.inputs['Type'].default_value = glare_type
                 except Exception: pass
             elif hasattr(node, 'glare_type'):
-                type_map = {'Bloom': 'BLOOM', 'Fog Glow': 'FOG_GLOW', 'Streaks': 'STREAKS', 'Ghosts': 'GHOSTS', 'Simple Star': 'SIMPLE_STAR'}
+                type_map = dict([('Bloom', 'BLOOM'), ('Fog Glow', 'FOG_GLOW'), ('Streaks', 'STREAKS'), ('Ghosts', 'GHOSTS'), ('Simple Star', 'SIMPLE_STAR')])
                 gt = type_map.get(glare_type, glare_type.upper().replace(' ', '_'))
                 try:
                     enum_vals = [e.identifier for e in node.bl_rna.properties['glare_type'].enum_items]
@@ -6255,7 +6255,7 @@ if needs_layer_comp or needs_engine_bloom or fx_mode in (
         if out_n and 'Image' in out_n.inputs:
             ng.links.new(cur_img, out_n.inputs['Image'])
     except Exception as comp_err:
-        print(f"Warning: Compositing FX setup encountered an error ({comp_err}), falling back to direct render layer.")
+        print("Warning: Compositing FX setup encountered an error:", str(comp_err), "falling back to direct render layer.")
         try:
             if ng is not None:
                 ng.nodes.clear()
@@ -6266,7 +6266,7 @@ if needs_layer_comp or needs_engine_bloom or fx_mode in (
                     out_n = ng.nodes.new('CompositorNodeComposite')
                 ng.links.new(rl_fb.outputs['Image'], out_n.inputs['Image'])
         except Exception as comp_err2:
-            print(f"Warning: Direct composite fallback also failed ({comp_err2}). Disabling compositing.")
+            print("Warning: Direct composite fallback also failed:", str(comp_err2), "Disabling compositing.")
             scene.render.use_compositing = False
 
 # Fast uncompressed PNG output compiled by FFmpeg
@@ -6276,7 +6276,7 @@ scene.render.filepath = "{frames_dir}/f_"
 try:
     bpy.ops.render.render(animation=True)
 except Exception as e:
-    sys.stderr.write(f"FATAL: bpy.ops.render.render failed: {e}\\n")
+    sys.stderr.write("FATAL: bpy.ops.render.render failed: " + str(e) + "\\n")
     traceback.print_exc()
     sys.exit(1)
 '''
