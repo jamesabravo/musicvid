@@ -58,6 +58,62 @@ class MidiAnalysis:
         mid = mido.MidiFile(self.midi_path)
         ticks_per_beat = mid.ticks_per_beat
 
+        try:
+            from .config import get_config
+            cfg = get_config()
+            midi_cfg = cfg.get("midi", {})
+        except Exception:
+            midi_cfg = {}
+
+        cfg_bars_per_cut = int(midi_cfg.get("bars_per_cut", 8) or 8)
+        trigger_channel = int(midi_cfg.get("trigger_channel", 16) or 16)
+        trigger_keywords = [k.lower() for k in midi_cfg.get("trigger_track_names", ["cuts", "camera", "video", "sections", "markers"])]
+
+        # Detect any dedicated trigger tracks (e.g. tracks named 'Cuts', 'Camera', 'Video', 'Sections')
+        trigger_tracks = []
+        for track in mid.tracks:
+            t_name = (track.name or "").lower().strip()
+            if any(k in t_name for k in trigger_keywords):
+                trigger_tracks.append(track)
+
+        # Build tempo map for tick-to-second conversion if trigger tracks exist
+        if trigger_tracks:
+            tempo_changes = []
+            abs_tk = 0
+            for msg in mid.merged_track:
+                abs_tk += msg.time
+                if msg.type == 'set_tempo':
+                    tempo_changes.append((abs_tk, msg.tempo))
+            if not tempo_changes or tempo_changes[0][0] > 0:
+                tempo_changes.insert(0, (0, 500000))
+            tempo_map = []
+            c_sec = 0.0
+            l_tk = 0
+            l_tempo = 500000
+            for tk, tp in tempo_changes:
+                c_sec += mido.tick2second(tk - l_tk, ticks_per_beat, l_tempo)
+                tempo_map.append((tk, tp, c_sec))
+                l_tk = tk
+                l_tempo = tp
+
+            def _tick_to_sec(target_tk):
+                seg = tempo_map[0]
+                for s in tempo_map:
+                    if s[0] <= target_tk:
+                        seg = s
+                    else:
+                        break
+                return seg[2] + mido.tick2second(target_tk - seg[0], ticks_per_beat, seg[1])
+
+            for t_track in trigger_tracks:
+                tk_cur = 0
+                for msg in t_track:
+                    tk_cur += msg.time
+                    if msg.type == 'note_on' and msg.velocity > 0:
+                        t_sec = _tick_to_sec(tk_cur) * self.time_factor
+                        note_lbl = f"Cue {midi_note_to_name(msg.note)}"
+                        self.section_markers.append((t_sec, note_lbl))
+
         # Determine overall tempo if set
         current_tempo = 500000  # Default 120 BPM (500,000 microseconds per beat)
         for msg in mid:
@@ -83,12 +139,17 @@ class MidiAnalysis:
                 bpm_val = round(mido.tempo2bpm(current_tempo) / self.time_factor, 1)
                 self.midi_messages.append((current_time, f"[{ts_str}] META  SET_TEMPO   BPM={bpm_val}"))
 
-            # Capture Song Section Markers and Sysex Segment Markers
-            if msg.type in ('marker', 'cue_marker'):
+            # Capture Song Section Markers, DAW Text/Cue Events and Sysex Segment Markers
+            if msg.type in ('marker', 'cue_marker', 'text', 'lyrics'):
                 raw_text = getattr(msg, 'text', '').strip()
-                label = raw_text if raw_text else f"Section {len(self.section_markers) + 1}"
-                self.section_markers.append((current_time, label))
-                self.midi_messages.append((current_time, f"[{ts_str}] META  MARKER      '{label[:18]}'"))
+                if raw_text:
+                    low_text = raw_text.lower()
+                    is_meta_header = any(low_text.startswith(p) for p in ("copyright", "created by", "format:", "http", "www."))
+                    if not is_meta_header:
+                        label = raw_text
+                        self.section_markers.append((current_time, label))
+                        mtype_str = msg.type.upper()[:6]
+                        self.midi_messages.append((current_time, f"[{ts_str}] META  {mtype_str:<12} '{label[:18]}'"))
             elif msg.type == 'sysex':
                 data_bytes = bytes(getattr(msg, 'data', []))
                 label = ""
@@ -137,6 +198,11 @@ class MidiAnalysis:
                 active_notes[key] = (current_time, vel)
                 self.midi_messages.append((current_time, f"[{ts_str}] CH{chan+1:02d}  NOTE_ON     {midi_note_to_name(note):<3} ({note:03d}) VEL={msg.velocity:03d}"))
 
+                # Check for dedicated Trigger Channel (e.g. Channel 16 / index 15)
+                if trigger_channel > 0 and (chan + 1) == trigger_channel:
+                    note_lbl = f"Ch{trigger_channel} {midi_note_to_name(note)}"
+                    self.section_markers.append((current_time, note_lbl))
+
                 # Check for standard GM Drum Channel (Channel 9 in 0-indexed, 10 in 1-indexed)
                 is_drum_channel = (chan == 9)
 
@@ -163,8 +229,13 @@ class MidiAnalysis:
         self.note_spans.sort(key=lambda x: x[0])
         self.midi_messages.sort(key=lambda x: x[0])
 
-        # Sort and deduplicate section markers
+        # Sort and deduplicate section markers (keep earliest if closer than 0.5s)
         self.section_markers.sort(key=lambda x: x[0])
+        deduped = []
+        for sm_time, sm_lbl in self.section_markers:
+            if not deduped or (sm_time - deduped[-1][0] >= 0.5):
+                deduped.append((sm_time, sm_lbl))
+        self.section_markers = deduped
 
         # Fallback if no kicks or snares detected (e.g. ambient or purely classical MIDI)
         beat_sec = 60.0 / max(1.0, self.bpm)
@@ -186,15 +257,13 @@ class MidiAnalysis:
                 self.snares.append((t, 0.7))
                 t += (beat_sec * 2)
 
-        # Compute measure cut candidates (e.g., every 1 or 2 bars = ~2.0s to ~4.5s)
-        # Suitable for TikTok / YouTube fast-paced montage
+        # Compute measure cut candidates (e.g. 8 bars or 16 bars on musical phrases)
         max_duration = max(self.total_duration, current_time)
         t = 0.0
-        # Determine cadence based on BPM: cut every 8 bars (~11s to 16s) or 4 bars (~6s)
-        bars_per_cut = 8 if self.bpm >= 140 else 4
-        cut_interval = bar_sec * bars_per_cut
-        if cut_interval < 6.0:
-            cut_interval = bar_sec * 8
+        phrase_bars = cfg_bars_per_cut
+        if bar_sec * phrase_bars < 8.0:
+            phrase_bars = max(8, phrase_bars * 2)
+        cut_interval = bar_sec * phrase_bars
 
         while t < max_duration:
             self.measure_cuts.append(t)
@@ -206,10 +275,10 @@ class MidiAnalysis:
                 # Add exact marker time
                 self.measure_cuts.append(sm_time)
 
-        # Merge crash cymbal hits into candidate cut points if they are at least 3.5s from previous cut
+        # Merge crash cymbal hits into candidate cut points if they are at least 4.5s from previous cut
         crash_cuts = [c[0] for c in self.crashes if c[0] > 1.0]
         for cc in crash_cuts:
-            if not any(abs(cc - mc) < 3.5 for mc in self.measure_cuts):
+            if not any(abs(cc - mc) < 4.5 for mc in self.measure_cuts):
                 self.measure_cuts.append(cc)
 
         self.measure_cuts = sorted(list(set([round(c, 3) for c in self.measure_cuts])))

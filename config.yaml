@@ -45,6 +45,17 @@ blender:
     - "C:\\Program Files\\Blender Foundation\\Blender 4.0\\blender.exe"
     - "C:\\Program Files\\Blender Foundation\\Blender 3.6\\blender.exe"
 
+# MIDI Synchronization & DAW Trigger Settings
+midi:
+  bars_per_cut: 8                   # Musical phrase cadence when no markers exist (e.g. 8 or 16 bars)
+  trigger_channel: 16               # Dedicated MIDI channel for camera/scene triggers (1-16, 0=disabled)
+  trigger_track_names:              # DAW track names that trigger scene cuts (case-insensitive)
+    - "cuts"
+    - "camera"
+    - "video"
+    - "sections"
+    - "markers"
+
 # Visual Effects & Reactive HUD
 effects:
   shake:

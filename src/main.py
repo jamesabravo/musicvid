@@ -204,7 +204,7 @@ def main():
     else:
         # Generate fresh timeline cuts, then render each unique 3D segment for its exact duration
         try:
-            print("[*] Scheduling SysEx-aligned timeline segments...")
+            print("[*] Scheduling timeline segments (SysEx, DAW markers, and phrase downbeats)...")
             scheduler = CutScheduler(
                 themes=args.theme_list,
                 measure_cuts=midi_analysis.measure_cuts,

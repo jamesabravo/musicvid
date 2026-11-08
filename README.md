@@ -126,6 +126,51 @@ Once you like the pacing and visual edits of your draft, render the final video:
 
 ---
 
+## DAW Integration & MIDI Synchronization
+
+`musicvid` synchronizes video scene transitions and camera angles to your music using standard MIDI data exported from any DAW (**Reason**, **Ableton Live**, **FL Studio**, **Logic Pro**, **Cubase**, **Studio One**, **Reaper**, etc.).
+
+You can choose any of the following workflows based on how you produce:
+
+### Option 1: Automatic Phrase Downbeats (Zero Extra Setup)
+If your exported `.mid` file contains only your song's instruments and notes, `musicvid` automatically reads the tempo and time signature, cutting scene transitions on **8-bar or 16-bar phrase downbeats** (Bar 1, Beat 1) and drum transitions. You do not have to add any markers or configure anything in your DAW.
+
+---
+
+### Option 2: Dedicated "Cuts" Trigger Track (Recommended for Reason & Sequencers)
+To dictate exact camera cuts or scene transitions directly from your DAW piano roll:
+1. **Create an Empty Track:** Add a new MIDI instrument track in your DAW and name the track **`Cuts`**, **`Camera`**, or **`Video`** (case-insensitive).
+2. **Draw Trigger Notes:** In the sequencer piano roll, draw a short note (e.g. `C1` or any pitch) on Bar 1 Beat 1 wherever you want a camera switch or scene transition.
+3. **Export MIDI:** Go to `File > Export MIDI File...` (or your DAW's standard MIDI export).
+4. `musicvid` scans track names on import and converts every note on that track into a synchronized scene cut!
+
+> **How Camera Angles Switch:** Every cut automatically cycles through 4 cinematic shots:
+> * **Shot 1:** Rear Chase Cam (tracking behind craft)
+> * **Shot 2:** Cockpit Canopy POV (first-person forward perspective)
+> * **Shot 3:** Wing Tracking Cam (side-mounted dynamic angle)
+> * **Shot 4:** Action / Ground Cam (wide dramatic low-angle pass)
+
+---
+
+### Option 3: Timeline Section Markers (Song Arrangement Sync)
+If you organize your song structure using timeline markers:
+* **Cubase / Logic Pro / Studio One / Reaper:** Place markers along the top ruler or Marker Track (e.g. `Intro`, `Verse 1`, `Chorus`, `Drop`, `Outro`).
+* **FL Studio:** Add arrangement markers via `Time Markers > Add one...`.
+* **Export:** Ensure markers are included in your standard MIDI file export (`.mid`).
+* `musicvid` captures these as standard MIDI `marker`, `cue_marker`, or `text` meta events, turning each arrangement section into an exact visual scene cut and displaying the section name on the HUD.
+
+---
+
+### Option 4: Dedicated Trigger Channel (Channel 16)
+Any note placed on MIDI Channel 16 (configurable in `config.yaml` under `midi.trigger_channel`) will automatically trigger a camera angle or scene switch.
+
+---
+
+### Option 5: Advanced SysEx Markers (Legacy / Synthesizer Support)
+Full support for MIDI System Exclusive (`SysEx`) messages (ASCII-encoded section strings between `F0` and `F7`) is completely preserved and prioritized. Existing projects and SysEx-equipped MIDI files continue to work without modification.
+
+---
+
 ## Configuration (`config.yaml`)
 
 All global preferences and end-credit text can be customized directly in `config.yaml`.

@@ -100,6 +100,11 @@ DEFAULT_CONFIG = {
             r"C:\Program Files\Blender Foundation\Blender 3.6\blender.exe",
         ],
     },
+    "midi": {
+        "bars_per_cut": 8,
+        "trigger_channel": 16,
+        "trigger_track_names": ["cuts", "camera", "video", "sections", "markers"],
+    },
     "effects": {
         "shake": {"enabled": True, "max_shift_px": 18},
         "glitch": {"enabled": True, "max_shift_px": 16},

@@ -149,8 +149,8 @@ class CutScheduler:
         self.story_chapters = resolve_story_chapters(self.story, seed=self.seed) if self.story is not None else None
 
     def generate_timeline(self):
-        # 1. Determine segment transition times from SysEx / section markers:
-        # Option 2: Each segment lasts for the full duration of a SysEx section (1.0).
+        # 1. Determine segment transition times:
+        # Priority 1: SysEx markers, DAW timeline section markers, trigger tracks
         subdivided_markers = []
         if self.section_markers:
             if self.section_markers[0][0] > 3.0:
@@ -159,15 +159,28 @@ class CutScheduler:
                 m_time, m_label = self.section_markers[s_i]
                 subdivided_markers.append((round(m_time, 3), m_label))
         else:
-            t = 0.0
-            p_idx = 1
-            while t < self.total_duration - 8.0:
-                dur = self.rng.choice([20.0, 28.0, 36.0])
-                subdivided_markers.append((round(t, 3), f"SEC-{p_idx}"))
-                t += dur
-                p_idx += 1
+            # Priority 2: Fallback for raw DAW MIDI lacking explicit markers.
+            # Snap cuts to 8-bar / 16-bar musical phrase downbeats from measure_cuts
+            # instead of arbitrary seconds!
+            if self.measure_cuts and len(self.measure_cuts) > 1:
+                p_idx = 1
+                last_t = 0.0
+                subdivided_markers.append((0.0, "INTRO"))
+                for mc in self.measure_cuts:
+                    if (mc - last_t) >= 10.0 and (self.total_duration - mc) >= 6.0:
+                        subdivided_markers.append((round(mc, 3), f"SEC-{p_idx}"))
+                        last_t = mc
+                        p_idx += 1
+            else:
+                t = 0.0
+                p_idx = 1
+                while t < self.total_duration - 8.0:
+                    dur = self.rng.choice([16.0, 24.0, 32.0])
+                    subdivided_markers.append((round(t, 3), f"SEC-{p_idx}"))
+                    t += dur
+                    p_idx += 1
 
-        # 2. Build cut points directly from subdivided_markers so segments last the full SysEx duration
+        # 2. Build cut points directly from subdivided_markers so segments last the full duration
         points = [0.0]
         marker_map = {}
         for sm_time, sm_lbl in subdivided_markers:
