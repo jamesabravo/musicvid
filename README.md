@@ -273,6 +273,14 @@ Use the `-pitch <value>` flag (default: `63`). `musicvid` mathematically calcula
 
 ---
 
+## See It in Action
+
+To see full beat-synchronized renders, retro vector wireframes, and demoscene visuals created with `musicvid`:
+
+* **YouTube:** [Orbital Decay Vibes (@OrbitalDecayVibes)](https://www.youtube.com/@OrbitalDecayVibes)
+
+---
+
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
