@@ -30,6 +30,5 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Local personal notes & scratch files
+# Local personal notes
 readme.txt
-test_b.py
