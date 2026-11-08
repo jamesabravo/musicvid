@@ -1,6 +1,6 @@
 # musicvid
 
-![musicvid](assets/musicvid.png)
+[![musicvid](assets/musicvid.png)](https://www.youtube.com/watch?v=fla70WAohFE)
 
 > **Beat-synchronized 3D music video generator powered by Audio (.wav / .mp3) and MIDI (.mid) files.**
 
