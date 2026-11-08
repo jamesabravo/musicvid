@@ -29,3 +29,7 @@ Thumbs.db
 *.swo
 .vscode/
 .idea/
+
+# Local personal notes & scratch files
+readme.txt
+test_b.py
