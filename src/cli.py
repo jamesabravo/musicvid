@@ -80,7 +80,7 @@ def parse_args(argv=None):
     parser.add_argument(
         "-themes", "--themes",
         default=None,
-        help="Comma-separated list of visual themes (e.g. space, trippy, synthwave, vector_arcade, prismatic, quantum, spaceships, starfield, landscape)",
+        help="Comma-separated list of visual themes (e.g. space, spaceships, trippy, synthwave, vector_arcade, prismatic, quantum, landscape, backrooms, op_art, doom, story)",
     )
     parser.add_argument(
         "-story", "--story",
@@ -92,7 +92,7 @@ def parse_args(argv=None):
     parser.add_argument(
         "-palette", "--palette",
         default=None,
-        help="Colorway palette (e.g. cyberpunk_neon, nostromo_amber, matrix_phosphor, solar_flare)",
+        help="Colorway palette (e.g. cyberpunk_neon, nostromo_amber, matrix_phosphor, solar_flare, doom, op_art, toxic_acid)",
     )
     parser.add_argument(
         "-piano-dir", "--piano-dir",
@@ -250,6 +250,10 @@ def parse_args(argv=None):
             norm = "story"
         elif any(k in tl for k in ("backrooms", "backroom", "liminal", "vhs", "found_footage", "yellow_rooms")):
             norm = "backrooms"
+        elif any(k in tl for k in ("doom", "e1m1", "hell", "nukage", "idtech", "techbase", "demon")):
+            norm = "doom"
+        elif any(k in tl for k in ("op_art", "opart", "grid_tunnel", "insanity", "geometry_insanity", "bw_grid", "optical", "grid")):
+            norm = "op_art"
         elif any(k in tl for k in ("trippy", "psychedelic", "acid", "kaleidoscope", "mandala", "vortex")):
             norm = "trippy"
         elif any(k in tl for k in ("synthwave", "outrun", "retrowave", "neon_grid", "cybergrid")):

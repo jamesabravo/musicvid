@@ -86,6 +86,10 @@ def build_scene_script(theme_name, clip_index, width, height, fps, duration, fra
                 story_chapters = parsed
     elif any(k in tn for k in ("backrooms", "backroom", "liminal", "vhs", "found_footage", "yellow_rooms")):
         scene_type = "backrooms"
+    elif any(k in tn for k in ("doom", "e1m1", "hell", "nukage", "idtech", "techbase", "demon")):
+        scene_type = "doom"
+    elif any(k in tn for k in ("op_art", "opart", "grid_tunnel", "insanity", "geometry_insanity", "bw_grid", "optical", "grid")):
+        scene_type = "op_art"
     elif any(k in tn for k in ("trippy", "psychedelic", "acid", "kaleidoscope", "mandala", "vortex")):
         scene_type = "trippy"
     elif any(k in tn for k in ("synthwave", "outrun", "retrowave", "neon_grid", "cybergrid")):
@@ -108,7 +112,7 @@ def build_scene_script(theme_name, clip_index, width, height, fps, duration, fra
         scene_type = "space"
 
     # Pure starfield warp acceleration clips, hyperspace jump clips, and procedural theme clips use bloom_glare FX
-    if (scene_type in ("story", "backrooms", "trippy", "synthwave", "vector_arcade", "prismatic", "quantum", "starfield_warp") or
+    if (scene_type in ("story", "backrooms", "doom", "op_art", "trippy", "synthwave", "vector_arcade", "prismatic", "quantum", "starfield_warp") or
         (scene_type == "space" and (clip_index % 9 == 5)) or
         (scene_type == "spaceships" and (clip_index % 3 == 1)) or
         (scene_type == "space" and (clip_index % 9 == 7))):
@@ -212,9 +216,9 @@ space_mode = None
 is_starfield_warp = (scene_type == "starfield_warp") or (scene_type == "space" and (clip_idx % 9 == 5))
 
 # Half of the renders are 100% full solid 3D renders lit by 1 or 2 simulated Sun light sources (unless pure starfield warp)
-# In continuous story mode and backrooms mode, lock full solid 2-sun studio lighting so walls and corridors are solidly shaded
-is_full_solid_clip = True if (scene_type in ("story", "backrooms")) else ((clip_idx % 2 == 0) and not is_starfield_warp)
-num_suns = 2 if (scene_type in ("story", "backrooms")) else (1 if (clip_idx % 4 == 0) else 2)
+# In continuous story mode, backrooms mode, and doom mode, lock full solid 2-sun studio lighting so walls and corridors are solidly shaded
+is_full_solid_clip = True if (scene_type in ("story", "backrooms", "doom")) else ((clip_idx % 2 == 0) and not is_starfield_warp)
+num_suns = 2 if (scene_type in ("story", "backrooms", "doom")) else (1 if (clip_idx % 4 == 0) else 2)
 
 # Add Camera Rig (with TRACK_TO constraint) & Child Camera Lens (for forward-axis roll on flythroughs)
 cam = bpy.data.objects.new('CameraRig', None)
@@ -4730,6 +4734,1104 @@ elif scene_type == "backrooms":
             ent_root.keyframe_insert('location', frame=f)
             ent_root.keyframe_insert('rotation_euler', frame=f)
 
+elif scene_type == "op_art":
+    # =========================================================================
+    # OP-ART, WIREFRAME LATTICE TUNNELS & PSYCHEDELIC GEOMETRY
+    # 4 Hypnotic Optical Illusion Archetypes:
+    #   Mode 0: "▲ Grid" B&W Geometric Lattice Tunnel (Homage to Roland vd Velden / Space is Green)
+    #           Diamond/rhombus wireframe fences, receding perspective floor/ceil grids,
+    #           nested polygonal gateway portals, rhythmic forward zoom.
+    #   Mode 1: "The Geometry of Insanity" Stepped Rainbow Corridor (Homage to Pai Lactobacillus)
+    #           Concentric stepped portal frames with saturated rainbow bands,
+    #           high-contrast black & white checkerboard floor & ceiling, optical glyph side walls.
+    #   Mode 2: Optical Moiré Vortex & Geodesic Stargate
+    #           Counter-rotating high-density spoke wheels creating dynamic moiré fringes.
+    #   Mode 3: Hexagonal Honeycomb Infinite Wormhole
+    #           Continuous 6-sided honeycomb corridor with diagonal lattice ribs and forward camera roll.
+    # =========================================================================
+    if cam.constraints:
+        for c_old in list(cam.constraints):
+            cam.constraints.remove(c_old)
+    con = cam.constraints.new('TRACK_TO')
+    con.target = target
+    con.track_axis = 'TRACK_NEGATIVE_Z'
+    con.up_axis = 'UP_Y'
+
+    cam_data.clip_start = 0.10
+    cam_data.clip_end = 450.0
+    cam_data.lens = 22.0
+
+    op_mode = clip_idx % 4
+    op_rng = random.Random(c_seed * 419 + 73)
+    CORR_LEN = 130.0
+
+    if op_mode == 0:
+        # Mode 0: "▲ Grid" B&W Geometric Lattice Tunnel
+        scene.display.shading.light = 'FLAT'
+        scene.display.shading.background_color = (0.0, 0.0, 0.0)
+
+        # 1. Floor & Ceiling Perspective Grids
+        def make_op_flat_grid(name, z_pos, wx_span=4.6, x_steps=18, y_steps=65):
+            bm = bmesh.new()
+            rows = []
+            for jy in range(y_steps + 1):
+                wy = -10.0 + jy * (CORR_LEN / float(y_steps))
+                r_v = []
+                for ix in range(x_steps + 1):
+                    wx = -wx_span + ix * (2.0 * wx_span / float(x_steps))
+                    r_v.append(bm.verts.new((wx, wy, z_pos)))
+                rows.append(r_v)
+            for jy in range(y_steps):
+                for ix in range(x_steps):
+                    bm.faces.new((rows[jy][ix], rows[jy][ix + 1], rows[jy + 1][ix + 1], rows[jy + 1][ix]))
+            mesh = bpy.data.meshes.new(name + "Mesh")
+            bm.to_mesh(mesh)
+            bm.free()
+            obj = bpy.data.objects.new(name, mesh)
+            foreground_col.objects.link(obj)
+            obj.color = (1.0, 1.0, 1.0, 1.0)
+            mod = obj.modifiers.new("Wire", "WIREFRAME")
+            mod.thickness = 0.04
+            mod.use_replace = True
+            return obj
+
+        make_op_flat_grid("FloorGrid", -3.6)
+        make_op_flat_grid("CeilGrid", 3.6)
+
+        # 2. Left & Right Criss-Cross Diamond Lattice Walls (with center vertices for 4-way diagonal wireframe)
+        def make_op_diamond_wall(name, wx_pos, y_steps=55, z_steps=12, z_min=-3.6, z_max=3.6):
+            bm = bmesh.new()
+            rows = []
+            for jy in range(y_steps + 1):
+                wy = -10.0 + jy * (CORR_LEN / float(y_steps))
+                r_v = []
+                for iz in range(z_steps + 1):
+                    wz = z_min + iz * ((z_max - z_min) / float(z_steps))
+                    r_v.append(bm.verts.new((wx_pos, wy, wz)))
+                rows.append(r_v)
+            for jy in range(y_steps):
+                for iz in range(z_steps):
+                    v0 = rows[jy][iz]
+                    v1 = rows[jy][iz + 1]
+                    v2 = rows[jy + 1][iz + 1]
+                    v3 = rows[jy + 1][iz]
+                    my = (v0.co.y + v2.co.y) * 0.5
+                    mz = (v0.co.z + v2.co.z) * 0.5
+                    vm = bm.verts.new((wx_pos, my, mz))
+                    bm.faces.new((v0, v1, vm))
+                    bm.faces.new((v1, v2, vm))
+                    bm.faces.new((v2, v3, vm))
+                    bm.faces.new((v3, v0, vm))
+            mesh = bpy.data.meshes.new(name + "Mesh")
+            bm.to_mesh(mesh)
+            bm.free()
+            obj = bpy.data.objects.new(name, mesh)
+            foreground_col.objects.link(obj)
+            obj.color = (1.0, 1.0, 1.0, 1.0)
+            mod = obj.modifiers.new("Wire", "WIREFRAME")
+            mod.thickness = 0.045
+            mod.use_replace = True
+            return obj
+
+        make_op_diamond_wall("WallLeft", -5.2)
+        make_op_diamond_wall("WallRight", 5.2)
+
+        # 3. Geometric Nested Portal Gates (Annular ribbon frames with quad faces)
+        num_gates = 11
+        gate_spacing = 10.5
+        for g_i in range(num_gates):
+            wy = 6.0 + g_i * gate_spacing
+            num_pts = 8 if (g_i % 2 == 0) else 6
+            bm_gate = bmesh.new()
+            for ring_i in range(3):
+                r_scale = (1.0 - ring_i * 0.28)
+                r_out = 5.4 * r_scale
+                r_in = r_out - 0.16
+                ov = [bm_gate.verts.new((r_out * math.cos(p * (2.0 * math.pi / float(num_pts)) + math.pi / float(num_pts)), wy, r_out * math.sin(p * (2.0 * math.pi / float(num_pts)) + math.pi / float(num_pts)))) for p in range(num_pts)]
+                iv = [bm_gate.verts.new((r_in * math.cos(p * (2.0 * math.pi / float(num_pts)) + math.pi / float(num_pts)), wy, r_in * math.sin(p * (2.0 * math.pi / float(num_pts)) + math.pi / float(num_pts)))) for p in range(num_pts)]
+                for p in range(num_pts):
+                    np = (p + 1) % num_pts
+                    bm_gate.faces.new((ov[p], ov[np], iv[np], iv[p]))
+            m_gate = bpy.data.meshes.new("OpGate_" + str(g_i))
+            bm_gate.to_mesh(m_gate)
+            bm_gate.free()
+            o_gate = bpy.data.objects.new("OpGate_" + str(g_i), m_gate)
+            foreground_col.objects.link(o_gate)
+            o_gate.color = (1.0, 1.0, 1.0, 1.0)
+            mod_s = o_gate.modifiers.new("Solid", "SOLIDIFY")
+            mod_s.thickness = 0.35
+            mod_s.offset = 1.0
+
+        # Forward camera glide with rhythmic FOV zoom
+        travel_y = 70.0
+        for f in range(1, total_f + 1):
+            u_f = (f - 1) / float(max(1, total_f - 1))
+            wy = u_f * travel_y
+            cam.location = (0.0, wy, 0.0)
+            target.location = (0.0, wy + 35.0, 0.0)
+            cam_data.lens = 22.0 + 4.0 * math.sin(u_f * math.pi * 4.0)
+            cam.keyframe_insert('location', frame=f)
+            target.keyframe_insert('location', frame=f)
+            cam_data.keyframe_insert('lens', frame=f)
+
+    elif op_mode == 1:
+        # Mode 1: "The Geometry of Insanity" Stepped Rainbow Corridor with Checkerboard Floor
+        scene.display.shading.light = 'STUDIO'
+        scene.display.shading.background_color = (0.01, 0.01, 0.02)
+
+        # 1. Checkerboard Floor & Ceiling
+        def make_op_checker_plane(name_prefix, z_pos, wx_span=6.5, nx=18, ny=55):
+            bm_white = bmesh.new()
+            bm_black = bmesh.new()
+            for jy in range(ny):
+                y0 = -10.0 + jy * (CORR_LEN / float(ny))
+                y1 = -10.0 + (jy + 1) * (CORR_LEN / float(ny))
+                for ix in range(nx):
+                    x0 = -wx_span + ix * (2.0 * wx_span / float(nx))
+                    x1 = -wx_span + (ix + 1) * (2.0 * wx_span / float(nx))
+                    target_bm = bm_white if ((ix + jy) % 2 == 0) else bm_black
+                    v0 = target_bm.verts.new((x0, y0, z_pos))
+                    v1 = target_bm.verts.new((x1, y0, z_pos))
+                    v2 = target_bm.verts.new((x1, y1, z_pos))
+                    v3 = target_bm.verts.new((x0, y1, z_pos))
+                    target_bm.faces.new((v0, v1, v2, v3))
+            m_w = bpy.data.meshes.new(str(name_prefix) + "_White_Mesh")
+            bm_white.to_mesh(m_w)
+            bm_white.free()
+            o_w = bpy.data.objects.new(str(name_prefix) + "_White", m_w)
+            foreground_col.objects.link(o_w)
+            o_w.color = (0.97, 0.97, 0.98, 1.0)
+            m_b = bpy.data.meshes.new(str(name_prefix) + "_Black_Mesh")
+            bm_black.to_mesh(m_b)
+            bm_black.free()
+            o_b = bpy.data.objects.new(str(name_prefix) + "_Black", m_b)
+            foreground_col.objects.link(o_b)
+            o_b.color = (0.03, 0.03, 0.04, 1.0)
+
+        make_op_checker_plane("Floor", -3.2)
+        make_op_checker_plane("Ceil", 3.2)
+
+        # 2. Stepped Concentric Rainbow Portals
+        rainbow_palette = [
+            (1.0, 0.05, 0.70, 1.0),  # Electric Magenta
+            (1.0, 0.15, 0.05, 1.0),  # Hot Orange
+            (1.0, 0.92, 0.05, 1.0),  # Bright Yellow
+            (0.1, 0.98, 0.25, 1.0),  # Acid Lime
+            (0.0, 0.90, 1.0, 1.0),   # Electric Cyan
+            (0.2, 0.35, 1.0, 1.0),   # Deep Blue
+        ]
+        num_portals = 8
+        portal_gap = 14.0
+        for p_i in range(num_portals):
+            wy = 8.0 + p_i * portal_gap
+            for b_i in range(len(rainbow_palette)):
+                col = rainbow_palette[b_i]
+                scale_fac = 1.0 - b_i * 0.075
+                bw = 6.2 * scale_fac
+                bh = 3.6 * scale_fac
+                thickness = 0.22
+                bm = bmesh.new()
+                ov0 = bm.verts.new((-bw, wy, -bh))
+                ov1 = bm.verts.new((bw, wy, -bh))
+                ov2 = bm.verts.new((bw, wy, bh))
+                ov3 = bm.verts.new((-bw, wy, bh))
+                iw = bw - thickness
+                ih = bh - thickness
+                iv0 = bm.verts.new((-iw, wy, -ih))
+                iv1 = bm.verts.new((iw, wy, -ih))
+                iv2 = bm.verts.new((iw, wy, ih))
+                iv3 = bm.verts.new((-iw, wy, ih))
+                bm.faces.new((ov0, ov1, iv1, iv0))
+                bm.faces.new((ov1, ov2, iv2, iv1))
+                bm.faces.new((ov2, ov3, iv3, iv2))
+                bm.faces.new((ov3, ov0, iv0, iv3))
+                m_band = bpy.data.meshes.new("Portal_" + str(p_i) + "_Band_" + str(b_i))
+                bm.to_mesh(m_band)
+                bm.free()
+                o_band = bpy.data.objects.new("Portal_" + str(p_i) + "_Band_" + str(b_i), m_band)
+                foreground_col.objects.link(o_band)
+                o_band.color = col
+                mod_s = o_band.modifiers.new("Solid", "SOLIDIFY")
+                mod_s.thickness = 0.55
+                mod_s.offset = 1.0
+
+        # Center recursive portal aperture
+        center_bm = bmesh.new()
+        c_verts = [
+            center_bm.verts.new((-2.4, 45.0, -1.4)),
+            center_bm.verts.new((2.4, 45.0, -1.4)),
+            center_bm.verts.new((2.4, 45.0, 1.4)),
+            center_bm.verts.new((-2.4, 45.0, 1.4)),
+        ]
+        center_bm.faces.new(c_verts)
+        m_c = bpy.data.meshes.new("CenterAperture")
+        center_bm.to_mesh(m_c)
+        center_bm.free()
+        o_c = bpy.data.objects.new("CenterAperture", m_c)
+        foreground_col.objects.link(o_c)
+        o_c.color = (0.02, 0.02, 0.03, 1.0)
+        mod_w = o_c.modifiers.new("Wire", "WIREFRAME")
+        mod_w.thickness = 0.08
+
+        # Forward camera glide through recursive rainbow chambers
+        travel_y = 65.0
+        for f in range(1, total_f + 1):
+            u_f = (f - 1) / float(max(1, total_f - 1))
+            wy = u_f * travel_y
+            cam.location = (0.0, wy, 0.0)
+            target.location = (0.0, wy + 40.0, 0.0)
+            cam.keyframe_insert('location', frame=f)
+            target.keyframe_insert('location', frame=f)
+
+    elif op_mode == 2:
+        # Mode 2: Optical Moiré Vortex & Geodesic Stargate
+        scene.display.shading.light = 'FLAT'
+        scene.display.shading.background_color = (0.005, 0.005, 0.01)
+        num_wheels = 14
+        wheel_spacing = 8.5
+        for w_i in range(num_wheels):
+            wy = 5.0 + w_i * wheel_spacing
+            rot_dir = 1 if (w_i % 2 == 0) else -1
+            num_spokes = 28 if (w_i % 2 == 0) else 36
+            radius = 5.5
+            w = 0.05
+            bm_spokes = bmesh.new()
+            # 1. Solid quad ribbon spokes
+            for sp_i in range(num_spokes):
+                ang = sp_i * (2.0 * math.pi / float(num_spokes))
+                dx = -w * math.sin(ang)
+                dz = w * math.cos(ang)
+                v0 = bm_spokes.verts.new((dx, wy, dz))
+                v1 = bm_spokes.verts.new((-dx, wy, -dz))
+                v2 = bm_spokes.verts.new((radius * math.cos(ang) - dx, wy, radius * math.sin(ang) - dz))
+                v3 = bm_spokes.verts.new((radius * math.cos(ang) + dx, wy, radius * math.sin(ang) + dz))
+                bm_spokes.faces.new((v0, v1, v2, v3))
+            # 2. Solid outer rim
+            r_in = radius - 0.15
+            ov = [bm_spokes.verts.new((radius * math.cos(p * 2.0 * math.pi / float(num_spokes)), wy, radius * math.sin(p * 2.0 * math.pi / float(num_spokes)))) for p in range(num_spokes)]
+            iv = [bm_spokes.verts.new((r_in * math.cos(p * 2.0 * math.pi / float(num_spokes)), wy, r_in * math.sin(p * 2.0 * math.pi / float(num_spokes)))) for p in range(num_spokes)]
+            for p in range(num_spokes):
+                np = (p + 1) % num_spokes
+                bm_spokes.faces.new((ov[p], ov[np], iv[np], iv[p]))
+            m_sp = bpy.data.meshes.new("MoireSpokes_" + str(w_i))
+            bm_spokes.to_mesh(m_sp)
+            bm_spokes.free()
+            o_sp = bpy.data.objects.new("MoireSpokes_" + str(w_i), m_sp)
+            foreground_col.objects.link(o_sp)
+            o_sp.color = (1.0, 1.0, 1.0, 1.0) if (w_i % 3 == 0) else ((0.0, 0.95, 1.0, 1.0) if (w_i % 3 == 1) else (1.0, 0.1, 0.65, 1.0))
+            keyframe_ease_in(
+                o_sp, 'rotation_euler',
+                (0.0, 0.0, 0.0),
+                (0.0, math.radians(rot_dir * 180.0 * speed_factor), 0.0)
+            )
+
+        travel_y = 65.0
+        for f in range(1, total_f + 1):
+            u_f = (f - 1) / float(max(1, total_f - 1))
+            wy = u_f * travel_y
+            cam.location = (0.0, wy, 0.0)
+            target.location = (0.0, wy + 40.0, 0.0)
+            cam.keyframe_insert('location', frame=f)
+            target.keyframe_insert('location', frame=f)
+
+    else:
+        # Mode 3: Hexagonal Honeycomb Infinite Wormhole
+        scene.display.shading.light = 'FLAT'
+        scene.display.shading.background_color = (0.0, 0.0, 0.0)
+        num_rings = 45
+        r_spacing = 3.2
+        bm_hex = bmesh.new()
+        all_rings_ov = []
+
+        for r_i in range(num_rings):
+            wy = -5.0 + r_i * r_spacing
+            num_pts = 6
+            radius = 5.2 + 0.3 * math.sin(r_i * 0.4)
+            r_in = radius - 0.22
+            ov = [bm_hex.verts.new((radius * math.cos(p * (2.0 * math.pi / float(num_pts)) + math.pi / 6.0), wy, radius * math.sin(p * (2.0 * math.pi / float(num_pts)) + math.pi / 6.0))) for p in range(num_pts)]
+            iv = [bm_hex.verts.new((r_in * math.cos(p * (2.0 * math.pi / float(num_pts)) + math.pi / 6.0), wy, r_in * math.sin(p * (2.0 * math.pi / float(num_pts)) + math.pi / 6.0))) for p in range(num_pts)]
+            for p in range(num_pts):
+                np = (p + 1) % num_pts
+                bm_hex.faces.new((ov[p], ov[np], iv[np], iv[p]))
+            all_rings_ov.append(ov)
+
+        # Longitudinal rails and diagonal lattice between rings
+        for r_i in range(num_rings - 1):
+            r1 = all_rings_ov[r_i]
+            r2 = all_rings_ov[r_i + 1]
+            for p in range(6):
+                np = (p + 1) % 6
+                bm_hex.faces.new((r1[p], r1[np], r2[np], r2[p]))
+
+        m_hex = bpy.data.meshes.new("HexHoneycomb")
+        bm_hex.to_mesh(m_hex)
+        bm_hex.free()
+        o_hex = bpy.data.objects.new("HexHoneycomb", m_hex)
+        foreground_col.objects.link(o_hex)
+        o_hex.color = (1.0, 1.0, 1.0, 1.0)
+        mod_w = o_hex.modifiers.new("Wire", "WIREFRAME")
+        mod_w.thickness = 0.045
+        mod_w.use_replace = True
+
+        travel_y = 65.0
+        for f in range(1, total_f + 1):
+            u_f = (f - 1) / float(max(1, total_f - 1))
+            wy = u_f * travel_y
+            roll = u_f * math.radians(120.0)
+            cam.location = (0.0, wy, 0.0)
+            cam_lens.rotation_euler = (0.0, 0.0, roll)
+            target.location = (0.0, wy + 35.0, 0.0)
+            cam.keyframe_insert('location', frame=f)
+            cam_lens.keyframe_insert('rotation_euler', frame=f)
+            target.keyframe_insert('location', frame=f)
+
+elif scene_type == "doom":
+    # =========================================================================
+    # 1993 RETRO DOOM (idTech 1) THEME
+    # 4 Authentic Hell & Techbase Archetypes:
+    #   Mode 0: E1M1 Phobos Techbase Courtyard & Radioactive Nukage Slime Trench
+    #           Overcast Phobos mountain sky, concrete walls with horizontal seams,
+    #           branching side corridors, toxic nukage barrels, hazard signs,
+    #           heavy hydraulic exit blast door bulkhead with red EXIT light.
+    #   Mode 1: Nukage Refinery & Cavernous Acid Vat
+    #           Massive bubbling green radioactive acid basin below, industrial
+    #           ceiling rafters and large overhead discharge pipes, elevated steel
+    #           catwalk with branching side platforms leading to pump stations.
+    #   Mode 2: Hell Citadel & Gothic Inferno (E3M1/E4M1 style)
+    #           Volcanic burning Hell sky with jagged obsidian peaks and rolling
+    #           fiery smoke clouds, blood-red veined stone floors, carved pentagrams,
+    #           flaming skull cauldrons on pedestals, branching gothic side crypts.
+    #   Mode 3: Deimos Computer Matrix & Teleporter Anomaly
+    #           High-tech modular circuit floors, overhead cable conduits and ceiling
+    #           panels, glowing cyan teleporter dais, towering mainframe server banks
+    #           with blinking status LEDs, branching computer terminal rooms.
+    # Smooth forward first-person movement bob (X sway and Z footstep bob).
+    # Corridor extends seamlessly to Y = 160.0; camera glides to Y = 48.0,
+    # smoothly approaching architectural bulkheads at Y = 78.0 without clipping or void.
+    # =========================================================================
+    if cam.constraints:
+        for c_old in list(cam.constraints):
+            cam.constraints.remove(c_old)
+    con = cam.constraints.new('TRACK_TO')
+    con.target = target
+    con.track_axis = 'TRACK_NEGATIVE_Z'
+    con.up_axis = 'UP_Y'
+
+    cam_data.clip_start = 0.12
+    cam_data.clip_end = 450.0
+    cam_data.lens = 20.0
+
+    doom_mode = clip_idx % 4
+    doom_rng = random.Random(c_seed * 666 + 13)
+    CORR_LEN = 160.0
+    Z_FLR = -1.8
+    Z_CEIL = 2.4
+    Z_SLIME = -2.5
+
+    flicker_lights = []
+
+    # Helper: Procedural Mountain Backdrop
+    def make_dm_backdrop(sky_col, mtn1_col, mtn2_col):
+        scene.display.shading.background_color = sky_col
+        span_x = 140.0
+        n_pts = 60
+        y_mtn1 = 125.0
+        bm1 = bmesh.new()
+        for i in range(n_pts):
+            x0 = -span_x + i * (2.0 * span_x / float(n_pts))
+            x1 = -span_x + (i + 1) * (2.0 * span_x / float(n_pts))
+            h0 = 6.0 + 12.0 * (math.sin(i * 0.35)**2) + 6.0 * (math.cos(i * 0.72)**2)
+            h1 = 6.0 + 12.0 * (math.sin((i+1) * 0.35)**2) + 6.0 * (math.cos((i+1) * 0.72)**2)
+            v0 = bm1.verts.new((x0, y_mtn1, -2.0))
+            v1 = bm1.verts.new((x1, y_mtn1, -2.0))
+            v2 = bm1.verts.new((x1, y_mtn1, h1))
+            v3 = bm1.verts.new((x0, y_mtn1, h0))
+            bm1.faces.new((v0, v1, v2, v3))
+        m1 = bpy.data.meshes.new("MtnFar")
+        bm1.to_mesh(m1)
+        bm1.free()
+        o1 = bpy.data.objects.new("MtnFar", m1)
+        foreground_col.objects.link(o1)
+        o1.color = mtn1_col
+
+        y_mtn2 = 105.0
+        bm2 = bmesh.new()
+        for i in range(n_pts):
+            x0 = -span_x + i * (2.0 * span_x / float(n_pts))
+            x1 = -span_x + (i + 1) * (2.0 * span_x / float(n_pts))
+            h0 = 4.0 + 8.5 * (math.sin(i * 0.55 + 1.2)**2) + 4.5 * (math.cos(i * 0.95)**2)
+            h1 = 4.0 + 8.5 * (math.sin((i+1) * 0.55 + 1.2)**2) + 4.5 * (math.cos((i+1) * 0.95)**2)
+            v0 = bm2.verts.new((x0, y_mtn2, -2.0))
+            v1 = bm2.verts.new((x1, y_mtn2, -2.0))
+            v2 = bm2.verts.new((x1, y_mtn2, h1))
+            v3 = bm2.verts.new((x0, y_mtn2, h0))
+            bm2.faces.new((v0, v1, v2, v3))
+        m2 = bpy.data.meshes.new("MtnMid")
+        bm2.to_mesh(m2)
+        bm2.free()
+        o2 = bpy.data.objects.new("MtnMid", m2)
+        foreground_col.objects.link(o2)
+        o2.color = mtn2_col
+
+    # Helper: Radioactive Nukage Barrels
+    def make_dm_barrel(bx, by, bz=Z_FLR):
+        bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=0.42, depth=1.1, location=(bx, by, bz + 0.55))
+        bar = bpy.context.active_object
+        link_to_foreground(bar)
+        bar.color = (0.24, 0.34, 0.18, 1.0)
+        for rz in (0.35, 0.75):
+            bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=0.45, depth=0.08, location=(bx, by, bz + rz))
+            rib = bpy.context.active_object
+            link_to_foreground(rib)
+            rib.color = (0.16, 0.18, 0.15, 1.0)
+        bpy.ops.mesh.primitive_cylinder_add(vertices=10, radius=0.36, depth=0.08, location=(bx, by, bz + 1.11))
+        lid = bpy.context.active_object
+        link_to_foreground(lid)
+        lid.color = (0.15, 0.98, 0.05, 1.0)
+
+    # Helper: Inverted Yellow Triangular Hazard Signs
+    def make_dm_haz_sign(wx, wy, wz):
+        bm = bmesh.new()
+        h_sz = 0.55
+        v0 = bm.verts.new((wx, wy - h_sz, wz + h_sz * 0.6))
+        v1 = bm.verts.new((wx, wy + h_sz, wz + h_sz * 0.6))
+        v2 = bm.verts.new((wx, wy, wz - h_sz * 0.8))
+        bm.faces.new((v0, v1, v2))
+        m = bpy.data.meshes.new("HazSignMesh")
+        bm.to_mesh(m)
+        bm.free()
+        o = bpy.data.objects.new("HazSign", m)
+        foreground_col.objects.link(o)
+        o.color = (0.98, 0.82, 0.08, 1.0)
+        bm_in = bmesh.new()
+        s_in = 0.28
+        off_x = 0.02 if wx > 0 else -0.02
+        v0 = bm_in.verts.new((wx + off_x, wy - s_in, wz + s_in * 0.6))
+        v1 = bm_in.verts.new((wx + off_x, wy + s_in, wz + s_in * 0.6))
+        v2 = bm_in.verts.new((wx + off_x, wy, wz - s_in * 0.8))
+        bm_in.faces.new((v0, v1, v2))
+        m_in = bpy.data.meshes.new("HazSignInMesh")
+        bm_in.to_mesh(m_in)
+        bm_in.free()
+        o_in = bpy.data.objects.new("HazSignIn", m_in)
+        foreground_col.objects.link(o_in)
+        o_in.color = (0.05, 0.05, 0.05, 1.0)
+
+    # Helper: Branching Side Corridor / Room
+    def make_dm_side_room(x0, x1, y0, y1, wall_col, flr_col, has_ceil=True, ceil_col=(0.18, 0.19, 0.22, 1.0)):
+        bpy.ops.mesh.primitive_plane_add(size=1.0, location=((x0 + x1)/2.0, (y0 + y1)/2.0, Z_FLR))
+        fl = bpy.context.active_object
+        link_to_foreground(fl)
+        fl.scale = (abs(x1 - x0), abs(y1 - y0), 1.0)
+        fl.color = flr_col
+
+        bpy.ops.mesh.primitive_cube_add(size=1.0, location=(x1, (y0 + y1)/2.0, (Z_FLR + Z_CEIL)/2.0))
+        bw = bpy.context.active_object
+        link_to_foreground(bw)
+        bw.scale = (0.4, abs(y1 - y0), (Z_CEIL - Z_FLR))
+        bw.color = wall_col
+
+        for sy in (y0, y1):
+            bpy.ops.mesh.primitive_cube_add(size=1.0, location=((x0 + x1)/2.0, sy, (Z_FLR + Z_CEIL)/2.0))
+            sw = bpy.context.active_object
+            link_to_foreground(sw)
+            sw.scale = (abs(x1 - x0), 0.4, (Z_CEIL - Z_FLR))
+            sw.color = wall_col
+
+        if has_ceil:
+            bpy.ops.mesh.primitive_plane_add(size=1.0, location=((x0 + x1)/2.0, (y0 + y1)/2.0, Z_CEIL))
+            cl = bpy.context.active_object
+            link_to_foreground(cl)
+            cl.scale = (abs(x1 - x0), abs(y1 - y0), 1.0)
+            cl.color = ceil_col
+
+    if doom_mode == 0:
+        # Mode 0: E1M1 Phobos Techbase Courtyard & Radioactive Nukage Slime Trench
+        scene.display.shading.light = 'STUDIO'
+        make_dm_backdrop(
+            sky_col=(0.22, 0.23, 0.25),
+            mtn1_col=(0.16, 0.17, 0.19, 1.0),
+            mtn2_col=(0.10, 0.11, 0.13, 1.0)
+        )
+
+        # 1. Walkways with Tiled Floor Panels
+        def make_paneled_walkway(name, x_min, x_max):
+            bm = bmesh.new()
+            ny = 45
+            nx = 3
+            dx = (x_max - x_min) / float(nx)
+            dy = CORR_LEN / float(ny)
+            for jy in range(ny):
+                y0 = -10.0 + jy * dy
+                y1 = y0 + dy
+                for ix in range(nx):
+                    x0 = x_min + ix * dx
+                    x1 = x0 + dx
+                    v0 = bm.verts.new((x0, y0, Z_FLR))
+                    v1 = bm.verts.new((x1, y0, Z_FLR))
+                    v2 = bm.verts.new((x1, y1, Z_FLR))
+                    v3 = bm.verts.new((x0, y1, Z_FLR))
+                    bm.faces.new((v0, v1, v2, v3))
+            m = bpy.data.meshes.new(name + "Mesh")
+            bm.to_mesh(m)
+            bm.free()
+            o = bpy.data.objects.new(name, m)
+            foreground_col.objects.link(o)
+            o.color = (0.34, 0.32, 0.30, 1.0)
+            return o
+
+        make_paneled_walkway("WalkLeft", -4.5, -1.4)
+        make_paneled_walkway("WalkRight", 1.4, 4.5)
+
+        # Crossover Bridge across Slime Trench near exit (Y = 62 to 78)
+        bpy.ops.mesh.primitive_plane_add(size=1.0, location=(0.0, 70.0, Z_FLR))
+        bridge = bpy.context.active_object
+        link_to_foreground(bridge)
+        bridge.scale = (3.2, 16.0, 1.0)
+        bridge.color = (0.32, 0.33, 0.36, 1.0)
+
+        # 2. Central Nukage Slime Trench (ending at crossover bridge Y = 62.0)
+        bm_slime = bmesh.new()
+        ny_slime = 36
+        y_slime_max = 62.0
+        dy_slime = (y_slime_max - (-10.0)) / float(ny_slime)
+        for jy in range(ny_slime):
+            y0 = -10.0 + jy * dy_slime
+            y1 = y0 + dy_slime
+            v0 = bm_slime.verts.new((-1.4, y0, Z_SLIME))
+            v1 = bm_slime.verts.new((1.4, y0, Z_SLIME))
+            v2 = bm_slime.verts.new((1.4, y1, Z_SLIME))
+            v3 = bm_slime.verts.new((-1.4, y1, Z_SLIME))
+            bm_slime.faces.new((v0, v1, v2, v3))
+        m_slime = bpy.data.meshes.new("NukageMesh")
+        bm_slime.to_mesh(m_slime)
+        bm_slime.free()
+        o_slime = bpy.data.objects.new("NukageTrench", m_slime)
+        foreground_col.objects.link(o_slime)
+        o_slime.color = (0.16, 0.98, 0.05, 1.0)
+
+        # 3. Hazard Caution Stripes along Trench Curbs and Bridge Edges
+        def make_dm_hazard_curbs(x_pos, y_end=62.0):
+            bm_y = bmesh.new()
+            bm_k = bmesh.new()
+            n_tiles = 48
+            t_len = (y_end - (-10.0)) / float(n_tiles)
+            c_w = 0.28
+            for i in range(n_tiles):
+                y0 = -10.0 + i * t_len
+                y1 = y0 + t_len
+                target_bm = bm_y if (i % 2 == 0) else bm_k
+                v0 = target_bm.verts.new((x_pos - c_w/2, y0, Z_FLR + 0.02))
+                v1 = target_bm.verts.new((x_pos + c_w/2, y0, Z_FLR + 0.02))
+                v2 = target_bm.verts.new((x_pos + c_w/2, y1, Z_FLR + 0.02))
+                v3 = target_bm.verts.new((x_pos - c_w/2, y1, Z_FLR + 0.02))
+                target_bm.faces.new((v0, v1, v2, v3))
+            m_y = bpy.data.meshes.new("HazardYel_" + str(x_pos))
+            bm_y.to_mesh(m_y)
+            bm_y.free()
+            o_y = bpy.data.objects.new("HazardYel_" + str(x_pos), m_y)
+            foreground_col.objects.link(o_y)
+            o_y.color = (1.0, 0.82, 0.05, 1.0)
+            m_b = bpy.data.meshes.new("HazardBlk_" + str(x_pos))
+            bm_k.to_mesh(m_b)
+            bm_k.free()
+            o_b = bpy.data.objects.new("HazardBlk_" + str(x_pos), m_b)
+            foreground_col.objects.link(o_b)
+            o_b.color = (0.05, 0.05, 0.06, 1.0)
+
+        make_dm_hazard_curbs(-1.3, 62.0)
+        make_dm_hazard_curbs(1.3, 62.0)
+
+        # Bridge End Curb across trench at Y = 62.0
+        bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0.0, 62.0, Z_FLR + 0.04))
+        curb_x = bpy.context.active_object
+        link_to_foreground(curb_x)
+        curb_x.scale = (2.8, 0.35, 0.08)
+        curb_x.color = (1.0, 0.82, 0.05, 1.0)
+
+        # 4. Segmented Concrete Walls with Side Openings
+        left_wall_intervals = [(-10.0, 14.0), (24.0, 48.0), (58.0, 95.0)]
+        right_wall_intervals = [(-10.0, 28.0), (40.0, 95.0)]
+
+        def build_dm_walls(name, intervals, wx):
+            bm = bmesh.new()
+            for y0, y1 in intervals:
+                v0 = bm.verts.new((wx, y0, Z_FLR))
+                v1 = bm.verts.new((wx, y1, Z_FLR))
+                v2 = bm.verts.new((wx, y1, Z_CEIL))
+                v3 = bm.verts.new((wx, y0, Z_CEIL))
+                bm.faces.new((v0, v1, v2, v3))
+            m = bpy.data.meshes.new(name + "Mesh")
+            bm.to_mesh(m)
+            bm.free()
+            o = bpy.data.objects.new(name, m)
+            foreground_col.objects.link(o)
+            o.color = (0.38, 0.40, 0.42, 1.0)
+            mod = o.modifiers.new("Solid", "SOLIDIFY")
+            mod.thickness = 0.45
+            mod.offset = 1.0 if wx > 0 else -1.0
+            return o
+
+        build_dm_walls("WallLeft", left_wall_intervals, -4.6)
+        build_dm_walls("WallRight", right_wall_intervals, 4.6)
+
+        # Horizontal Seam Ribs on Walls
+        for h_z in [Z_FLR + 0.9, Z_FLR + 2.0, Z_CEIL - 0.05]:
+            for wx, intervals in [(-4.55, left_wall_intervals), (4.55, right_wall_intervals)]:
+                for y0, y1 in intervals:
+                    bpy.ops.mesh.primitive_cube_add(size=1.0, location=(wx, (y0 + y1)/2.0, h_z))
+                    trim = bpy.context.active_object
+                    link_to_foreground(trim)
+                    trim.scale = (0.14, (y1 - y0), 0.12)
+                    trim.color = (0.22, 0.24, 0.26, 1.0)
+
+        # Buttress Columns along corridor
+        for col_y in [0.0, 8.0, 26.0, 42.0, 60.0]:
+            for wx in (-4.7, 4.7):
+                bpy.ops.mesh.primitive_cube_add(size=1.0, location=(wx, col_y, (Z_FLR + Z_CEIL)/2.0))
+                butt = bpy.context.active_object
+                link_to_foreground(butt)
+                butt.scale = (0.6, 0.8, (Z_CEIL - Z_FLR) * 1.02)
+                butt.color = (0.25, 0.27, 0.30, 1.0)
+
+        # Arch Lintels over openings
+        def build_dm_lintel(wx, y0, y1):
+            bpy.ops.mesh.primitive_cube_add(size=1.0, location=(wx, (y0 + y1)/2.0, Z_CEIL - 0.35))
+            lin = bpy.context.active_object
+            link_to_foreground(lin)
+            lin.scale = (0.5, (y1 - y0), 0.7)
+            lin.color = (0.24, 0.25, 0.28, 1.0)
+
+        build_dm_lintel(-4.6, 14.0, 24.0)
+        build_dm_lintel(4.6, 28.0, 40.0)
+        build_dm_lintel(-4.6, 48.0, 58.0)
+
+        # 5. Branching Side Rooms
+        make_dm_side_room(-4.6, -14.0, 14.0, 24.0, wall_col=(0.30, 0.32, 0.35, 1.0), flr_col=(0.28, 0.29, 0.32, 1.0))
+        make_dm_side_room(4.6, 16.0, 28.0, 40.0, wall_col=(0.32, 0.34, 0.37, 1.0), flr_col=(0.28, 0.29, 0.32, 1.0))
+        make_dm_side_room(-4.6, -13.0, 48.0, 58.0, wall_col=(0.30, 0.32, 0.35, 1.0), flr_col=(0.28, 0.29, 0.32, 1.0))
+
+        # 6. Props: Nukage Barrels & Hazard Warning Signs
+        make_dm_haz_sign(-4.35, 6.0, Z_FLR + 1.6)
+        make_dm_haz_sign(4.35, 10.0, Z_FLR + 1.6)
+        make_dm_haz_sign(-4.35, 25.5, Z_FLR + 1.6)
+        make_dm_haz_sign(4.35, 26.5, Z_FLR + 1.6)
+        make_dm_haz_sign(4.35, 41.5, Z_FLR + 1.6)
+
+        make_dm_barrel(-7.5, 17.0)
+        make_dm_barrel(-8.6, 18.2)
+        make_dm_barrel(-7.2, 19.5)
+        make_dm_barrel(-10.2, 18.0)
+        make_dm_barrel(7.8, 32.0)
+        make_dm_barrel(9.0, 33.5)
+        make_dm_barrel(11.2, 35.0)
+        make_dm_barrel(-3.8, 4.0)
+        make_dm_barrel(3.8, 25.0)
+
+        # Computer Terminal with glowing screen in Left Alcove
+        bpy.ops.mesh.primitive_cube_add(size=1.0, location=(-12.5, 19.0, Z_FLR + 1.1))
+        term = bpy.context.active_object
+        link_to_foreground(term)
+        term.scale = (0.5, 2.6, 1.5)
+        term.color = (0.16, 0.18, 0.22, 1.0)
+        bpy.ops.mesh.primitive_cube_add(size=1.0, location=(-12.2, 19.0, Z_FLR + 1.2))
+        scr = bpy.context.active_object
+        link_to_foreground(scr)
+        scr.scale = (0.1, 1.6, 0.8)
+        scr.color = (0.08, 0.88, 0.95, 1.0)
+
+
+        # 7. End Bulkhead & Hydraulic Blast Door at Y = 78.0
+        bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0.0, 78.0, (Z_FLR + Z_CEIL)/2.0))
+        end_wall = bpy.context.active_object
+        link_to_foreground(end_wall)
+        end_wall.scale = (26.0, 1.2, (Z_CEIL - Z_FLR) * 1.6)
+        end_wall.color = (0.24, 0.26, 0.29, 1.0)
+
+        bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0.0, 77.0, (Z_FLR + Z_CEIL)/2.0))
+        frame = bpy.context.active_object
+        link_to_foreground(frame)
+        frame.scale = (6.6, 0.8, (Z_CEIL - Z_FLR) * 0.98)
+        frame.color = (0.95, 0.80, 0.05, 1.0)
+
+        bpy.ops.mesh.primitive_cube_add(size=1.0, location=(-1.4, 77.4, (Z_FLR + Z_CEIL)/2.0))
+        door_l = bpy.context.active_object
+        link_to_foreground(door_l)
+        door_l.scale = (2.6, 0.4, (Z_CEIL - Z_FLR) * 0.92)
+        door_l.color = (0.36, 0.38, 0.42, 1.0)
+
+        bpy.ops.mesh.primitive_cube_add(size=1.0, location=(1.4, 77.4, (Z_FLR + Z_CEIL)/2.0))
+        door_r = bpy.context.active_object
+        link_to_foreground(door_r)
+        door_r.scale = (2.6, 0.4, (Z_CEIL - Z_FLR) * 0.92)
+        door_r.color = (0.36, 0.38, 0.42, 1.0)
+
+        bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0.0, 76.5, Z_CEIL - 0.15))
+        exit_box = bpy.context.active_object
+        link_to_foreground(exit_box)
+        exit_box.scale = (2.6, 0.4, 0.6)
+        exit_box.color = (0.92, 0.10, 0.10, 1.0)
+
+    elif doom_mode == 1:
+        # Mode 1: Nukage Refinery & Cavernous Acid Vat
+        scene.display.shading.light = 'STUDIO'
+        make_dm_backdrop(
+            sky_col=(0.14, 0.18, 0.12),
+            mtn1_col=(0.12, 0.14, 0.11, 1.0),
+            mtn2_col=(0.08, 0.10, 0.07, 1.0)
+        )
+
+        # Massive radioactive acid basin
+        bpy.ops.mesh.primitive_plane_add(size=1.0, location=(0.0, CORR_LEN * 0.4, Z_SLIME))
+        vat = bpy.context.active_object
+        link_to_foreground(vat)
+        vat.scale = (60.0, CORR_LEN * 1.2, 1.0)
+        vat.color = (0.12, 0.96, 0.05, 1.0)
+
+        # Central Steel Grating Catwalk
+        bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0.0, 35.0, Z_FLR))
+        catwalk = bpy.context.active_object
+        link_to_foreground(catwalk)
+        catwalk.scale = (3.4, 90.0, 0.25)
+        catwalk.color = (0.34, 0.36, 0.40, 1.0)
+
+        # Yellow Safety Handrails along central catwalk
+        for rx in (-1.65, 1.65):
+            bpy.ops.mesh.primitive_cube_add(size=1.0, location=(rx, 35.0, Z_FLR + 0.8))
+            rail = bpy.context.active_object
+            link_to_foreground(rail)
+            rail.scale = (0.1, 90.0, 0.1)
+            rail.color = (1.0, 0.82, 0.05, 1.0)
+
+        # Branching Side Catwalk 1 (Left to Pump Station at Y = 20)
+        bpy.ops.mesh.primitive_cube_add(size=1.0, location=(-7.5, 20.0, Z_FLR))
+        cw_l = bpy.context.active_object
+        link_to_foreground(cw_l)
+        cw_l.scale = (11.0, 2.8, 0.25)
+        cw_l.color = (0.32, 0.34, 0.38, 1.0)
+
+        bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=3.2, depth=0.3, location=(-13.0, 20.0, Z_FLR))
+        pump_plat = bpy.context.active_object
+        link_to_foreground(pump_plat)
+        pump_plat.color = (0.28, 0.30, 0.34, 1.0)
+
+        # Pump pipes and barrels on platform
+        bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=0.8, depth=4.5, location=(-13.0, 20.0, Z_FLR + 2.25))
+        pump = bpy.context.active_object
+        link_to_foreground(pump)
+        pump.color = (0.42, 0.22, 0.16, 1.0)
+        make_dm_barrel(-11.5, 22.0)
+        make_dm_barrel(-14.2, 18.5)
+
+        # Branching Side Catwalk 2 (Right to Control Terminal at Y = 42)
+        bpy.ops.mesh.primitive_cube_add(size=1.0, location=(7.5, 42.0, Z_FLR))
+        cw_r = bpy.context.active_object
+        link_to_foreground(cw_r)
+        cw_r.scale = (11.0, 2.8, 0.25)
+        cw_r.color = (0.32, 0.34, 0.38, 1.0)
+
+        bpy.ops.mesh.primitive_cube_add(size=1.0, location=(13.0, 42.0, Z_FLR))
+        ctrl_plat = bpy.context.active_object
+        link_to_foreground(ctrl_plat)
+        ctrl_plat.scale = (6.0, 6.0, 0.3)
+        ctrl_plat.color = (0.28, 0.30, 0.34, 1.0)
+        make_dm_barrel(14.0, 43.5)
+        make_dm_barrel(12.2, 40.5)
+
+        # Under-catwalk support pylons in acid vat
+        for c_i in range(8):
+            cy = 8.0 + c_i * 12.0
+            cx = -6.8 if (c_i % 2 == 0) else 6.8
+            p_h = abs(Z_FLR - Z_SLIME) + 0.4
+            bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=0.9, depth=p_h, location=(cx, cy, Z_SLIME + p_h / 2.0))
+            col = bpy.context.active_object
+            link_to_foreground(col)
+            col.color = (0.28, 0.24, 0.20, 1.0)
+
+        # End Bulkhead at Y = 78.0
+        bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0.0, 78.0, (Z_FLR + Z_CEIL)/2.0))
+        end_wall = bpy.context.active_object
+        link_to_foreground(end_wall)
+        end_wall.scale = (28.0, 1.4, (Z_CEIL - Z_FLR) * 1.8)
+        end_wall.color = (0.24, 0.26, 0.28, 1.0)
+
+        bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0.0, 77.0, (Z_FLR + Z_CEIL)/2.0))
+        airlock = bpy.context.active_object
+        link_to_foreground(airlock)
+        airlock.scale = (6.0, 0.8, (Z_CEIL - Z_FLR) * 0.95)
+        airlock.color = (0.95, 0.78, 0.05, 1.0)
+
+        bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0.0, 77.4, (Z_FLR + Z_CEIL)/2.0))
+        door = bpy.context.active_object
+        link_to_foreground(door)
+        door.scale = (4.8, 0.4, (Z_CEIL - Z_FLR) * 0.90)
+        door.color = (0.38, 0.40, 0.44, 1.0)
+
+    elif doom_mode == 2:
+        # Mode 2: Hell Citadel & Gothic Inferno (E3M1/E4M1)
+        scene.display.shading.light = 'STUDIO'
+        make_dm_backdrop(
+            sky_col=(0.18, 0.05, 0.04),
+            mtn1_col=(0.12, 0.04, 0.03, 1.0),
+            mtn2_col=(0.08, 0.02, 0.02, 1.0)
+        )
+
+        # Blood-veined Stone Floor
+        bpy.ops.mesh.primitive_plane_add(size=1.0, location=(0.0, CORR_LEN * 0.4, Z_FLR))
+        flr = bpy.context.active_object
+        link_to_foreground(flr)
+        flr.scale = (40.0, CORR_LEN * 1.2, 1.0)
+        flr.color = (0.45, 0.08, 0.08, 1.0)
+
+        # Carved Floor Pentagrams (solid quad ribbons)
+        for p_i in range(4):
+            py = 10.0 + p_i * 18.0
+            bm_pent = bmesh.new()
+            z_pent = Z_FLR + 0.02
+            star_order = [0, 2, 4, 1, 3, 0]
+            pts = []
+            for sp in range(5):
+                ang = sp * (2.0 * math.pi / 5.0) - (math.pi / 2.0)
+                pts.append((3.2 * math.cos(ang), py + 3.2 * math.sin(ang), z_pent))
+            w = 0.08
+            for i in range(5):
+                p0 = pts[star_order[i]]
+                p1 = pts[star_order[i+1]]
+                dx = p1[0] - p0[0]
+                dy = p1[1] - p0[1]
+                L = math.hypot(dx, dy)
+                nx = -dy / L * w
+                ny = dx / L * w
+                v0 = bm_pent.verts.new((p0[0] + nx, p0[1] + ny, z_pent))
+                v1 = bm_pent.verts.new((p0[0] - nx, p0[1] - ny, z_pent))
+                v2 = bm_pent.verts.new((p1[0] - nx, p1[1] - ny, z_pent))
+                v3 = bm_pent.verts.new((p1[0] + nx, p1[1] + ny, z_pent))
+                bm_pent.faces.new((v0, v1, v2, v3))
+            n_ring = 32
+            r_out = 3.4
+            r_in = 3.2
+            ov = [bm_pent.verts.new((r_out * math.cos(k * 2.0 * math.pi / float(n_ring)), py + r_out * math.sin(k * 2.0 * math.pi / float(n_ring)), z_pent)) for k in range(n_ring)]
+            iv = [bm_pent.verts.new((r_in * math.cos(k * 2.0 * math.pi / float(n_ring)), py + r_in * math.sin(k * 2.0 * math.pi / float(n_ring)), z_pent)) for k in range(n_ring)]
+            for k in range(n_ring):
+                nk = (k + 1) % n_ring
+                bm_pent.faces.new((ov[k], ov[nk], iv[nk], iv[k]))
+            m_pent = bpy.data.meshes.new("Pentagram_" + str(p_i))
+            bm_pent.to_mesh(m_pent)
+            bm_pent.free()
+            o_pent = bpy.data.objects.new("Pentagram_" + str(p_i), m_pent)
+            foreground_col.objects.link(o_pent)
+            o_pent.color = (0.95, 0.15, 0.12, 1.0)
+
+        # Scorched Brick Citadel Walls with Openings
+        h_left_intervals = [(-10.0, 16.0), (26.0, 50.0), (60.0, 95.0)]
+        h_right_intervals = [(-10.0, 30.0), (42.0, 95.0)]
+
+        def build_hell_walls(name, intervals, wx):
+            bm = bmesh.new()
+            for y0, y1 in intervals:
+                v0 = bm.verts.new((wx, y0, Z_FLR))
+                v1 = bm.verts.new((wx, y1, Z_FLR))
+                v2 = bm.verts.new((wx, y1, Z_CEIL + 0.6))
+                v3 = bm.verts.new((wx, y0, Z_CEIL + 0.6))
+                bm.faces.new((v0, v1, v2, v3))
+            m = bpy.data.meshes.new(name + "Mesh")
+            bm.to_mesh(m)
+            bm.free()
+            o = bpy.data.objects.new(name, m)
+            foreground_col.objects.link(o)
+            o.color = (0.35, 0.10, 0.10, 1.0)
+            mod = o.modifiers.new("Solid", "SOLIDIFY")
+            mod.thickness = 0.5
+            mod.offset = 1.0 if wx > 0 else -1.0
+            return o
+
+        build_hell_walls("HellWallLeft", h_left_intervals, -5.0)
+        build_hell_walls("HellWallRight", h_right_intervals, 5.0)
+
+        # Branching Gothic Crypts
+        make_dm_side_room(-5.0, -14.0, 16.0, 26.0, wall_col=(0.28, 0.08, 0.08, 1.0), flr_col=(0.35, 0.08, 0.08, 1.0), has_ceil=False)
+        make_dm_side_room(5.0, 15.0, 30.0, 42.0, wall_col=(0.28, 0.08, 0.08, 1.0), flr_col=(0.35, 0.08, 0.08, 1.0), has_ceil=False)
+
+        # Flaming Cauldrons / Skull Braziers on Pedestals
+        for b_i in range(8):
+            by = 6.0 + b_i * 10.0
+            bx = -3.8 if (b_i % 2 == 0) else 3.8
+            bpy.ops.mesh.primitive_cube_add(size=1.0, location=(bx, by, Z_FLR + 0.6))
+            ped = bpy.context.active_object
+            link_to_foreground(ped)
+            ped.scale = (0.8, 0.8, 1.2)
+            ped.color = (0.12, 0.10, 0.12, 1.0)
+            bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=2, radius=0.45, location=(bx, by, Z_FLR + 1.45))
+            flame = bpy.context.active_object
+            link_to_foreground(flame)
+            flame.color = (1.0, 0.35, 0.05, 1.0)
+            if b_i % 2 == 0:
+                flicker_lights.append((flame, b_i))
+
+        # Obsidian Columns
+        for c_i in range(6):
+            cy = 10.0 + c_i * 13.0
+            for cx in (-4.8, 4.8):
+                bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=0.7, depth=(Z_CEIL - Z_FLR) + 1.0, location=(cx, cy, (Z_FLR + Z_CEIL)/2.0))
+                col = bpy.context.active_object
+                link_to_foreground(col)
+                col.color = (0.10, 0.08, 0.10, 1.0)
+
+        # End Gateway at Y = 78.0: Demonic Fortress Arch & Portcullis
+        bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0.0, 78.0, (Z_FLR + Z_CEIL)/2.0))
+        end_wall = bpy.context.active_object
+        link_to_foreground(end_wall)
+        end_wall.scale = (26.0, 1.4, (Z_CEIL - Z_FLR) * 1.8)
+        end_wall.color = (0.22, 0.06, 0.06, 1.0)
+
+        bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0.0, 77.0, (Z_FLR + Z_CEIL)/2.0))
+        arch = bpy.context.active_object
+        link_to_foreground(arch)
+        arch.scale = (6.4, 0.8, (Z_CEIL - Z_FLR) * 1.1)
+        arch.color = (0.10, 0.08, 0.10, 1.0)
+
+        bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0.0, 77.4, (Z_FLR + Z_CEIL)/2.0))
+        gate = bpy.context.active_object
+        link_to_foreground(gate)
+        gate.scale = (5.2, 0.3, (Z_CEIL - Z_FLR) * 0.95)
+        gate.color = (0.55, 0.12, 0.08, 1.0)
+
+    else:
+        # Mode 3: Deimos Computer Matrix & Teleporter Gateway
+        scene.display.shading.light = 'STUDIO'
+        scene.display.shading.background_color = (0.012, 0.015, 0.022)
+
+        # Modular Tech Circuit Floor Tiles
+        def make_circuit_floor():
+            bm = bmesh.new()
+            ny = 40
+            nx = 8
+            dx = 12.0 / float(nx)
+            dy = CORR_LEN / float(ny)
+            for jy in range(ny):
+                y0 = -10.0 + jy * dy
+                y1 = y0 + dy
+                for ix in range(nx):
+                    x0 = -6.0 + ix * dx
+                    x1 = x0 + dx
+                    v0 = bm.verts.new((x0, y0, Z_FLR))
+                    v1 = bm.verts.new((x1, y0, Z_FLR))
+                    v2 = bm.verts.new((x1, y1, Z_FLR))
+                    v3 = bm.verts.new((x0, y1, Z_FLR))
+                    bm.faces.new((v0, v1, v2, v3))
+            m = bpy.data.meshes.new("CircuitFloor")
+            bm.to_mesh(m)
+            bm.free()
+            o = bpy.data.objects.new("CircuitFloor", m)
+            foreground_col.objects.link(o)
+            o.color = (0.16, 0.18, 0.22, 1.0)
+            return o
+
+        make_circuit_floor()
+
+        # Raised Hexagonal Teleporter Dais
+        bpy.ops.mesh.primitive_cylinder_add(vertices=6, radius=4.2, depth=0.4, location=(0.0, 32.0, Z_FLR + 0.2))
+        pad = bpy.context.active_object
+        link_to_foreground(pad)
+        pad.color = (0.10, 0.95, 1.0, 1.0)
+
+        # Branching Side Server Rooms
+        make_dm_side_room(-4.6, -14.0, 14.0, 24.0, wall_col=(0.18, 0.20, 0.24, 1.0), flr_col=(0.14, 0.15, 0.18, 1.0))
+        make_dm_side_room(4.6, 14.0, 36.0, 48.0, wall_col=(0.18, 0.20, 0.24, 1.0), flr_col=(0.14, 0.15, 0.18, 1.0))
+
+        # Mainframe Computer Server Racks along main corridor
+        for s_i in range(10):
+            sy = 6.0 + s_i * 8.5
+            if (14.0 <= sy <= 24.0) or (36.0 <= sy <= 48.0):
+                continue
+            for sx in (-4.2, 4.2):
+                bpy.ops.mesh.primitive_cube_add(size=1.0, location=(sx, sy, Z_FLR + 1.6))
+                rack = bpy.context.active_object
+                link_to_foreground(rack)
+                rack.scale = (0.8, 3.8, 3.2)
+                rack.color = (0.18, 0.20, 0.24, 1.0)
+
+                bpy.ops.mesh.primitive_cube_add(size=1.0, location=(sx * 0.90, sy, Z_FLR + 1.6))
+                led = bpy.context.active_object
+                link_to_foreground(led)
+                led.scale = (0.06, 3.4, 2.6)
+                led.color = (1.0, 0.20, 0.20, 1.0) if (s_i % 2 == 0) else (0.1, 0.95, 0.4, 1.0)
+
+        # Server Racks inside side rooms
+        for r_x, r_y in [(-10.0, 17.0), (-10.0, 21.0), (10.0, 39.0), (10.0, 44.0)]:
+            bpy.ops.mesh.primitive_cube_add(size=1.0, location=(r_x, r_y, Z_FLR + 1.6))
+            s_rack = bpy.context.active_object
+            link_to_foreground(s_rack)
+            s_rack.scale = (2.8, 0.8, 3.2)
+            s_rack.color = (0.18, 0.20, 0.24, 1.0)
+            bpy.ops.mesh.primitive_cube_add(size=1.0, location=(r_x, r_y * 0.98, Z_FLR + 1.6))
+            s_scr = bpy.context.active_object
+            link_to_foreground(s_scr)
+            s_scr.scale = (2.2, 0.06, 1.8)
+            s_scr.color = (0.10, 0.95, 0.90, 1.0)
+
+        # Solid High-Tech Ceiling Slab
+        bpy.ops.mesh.primitive_plane_add(size=1.0, location=(0.0, CORR_LEN * 0.4, Z_CEIL))
+        tech_ceil = bpy.context.active_object
+        link_to_foreground(tech_ceil)
+        tech_ceil.scale = (18.0, CORR_LEN * 1.2, 1.0)
+        tech_ceil.color = (0.12, 0.14, 0.18, 1.0)
+
+        # High-Tech Ceiling Cable Trusses & Panels
+        for c_i in range(7):
+            cy = 4.0 + c_i * 11.0
+            bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0.0, cy, Z_CEIL))
+            truss = bpy.context.active_object
+            link_to_foreground(truss)
+            truss.scale = (10.0, 0.4, 0.3)
+            truss.color = (0.22, 0.25, 0.28, 1.0)
+
+            bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0.0, cy, Z_CEIL - 0.15))
+            c_light = bpy.context.active_object
+            link_to_foreground(c_light)
+            c_light.scale = (2.0, 1.8, 0.1)
+            c_light.color = (0.85, 0.95, 1.0, 1.0)
+            if c_i % 3 == 0:
+                flicker_lights.append((c_light, c_i))
+
+        # End Security Checkpoint Bulkhead at Y = 78.0
+        bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0.0, 78.0, (Z_FLR + Z_CEIL)/2.0))
+        end_wall = bpy.context.active_object
+        link_to_foreground(end_wall)
+        end_wall.scale = (26.0, 1.2, (Z_CEIL - Z_FLR) * 1.6)
+        end_wall.color = (0.18, 0.20, 0.25, 1.0)
+
+        bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0.0, 77.0, (Z_FLR + Z_CEIL)/2.0))
+        gw = bpy.context.active_object
+        link_to_foreground(gw)
+        gw.scale = (6.4, 0.8, (Z_CEIL - Z_FLR) * 0.95)
+        gw.color = (0.10, 0.95, 1.0, 1.0)
+
+        bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0.0, 77.4, (Z_FLR + Z_CEIL)/2.0))
+        door = bpy.context.active_object
+        link_to_foreground(door)
+        door.scale = (5.2, 0.4, (Z_CEIL - Z_FLR) * 0.90)
+        door.color = (0.30, 0.34, 0.40, 1.0)
+
+    # First-Person Tactical Movement Animation
+    # Camera travels smoothly from Y = 0.0 to Y = 48.0, approaching Y = 78.0 bulkheads
+    travel_y = 48.0
+    for f in range(1, total_f + 1):
+        u_f = (f - 1) / float(max(1, total_f - 1))
+        wy = u_f * travel_y
+        bob_z = 0.07 * math.sin(f * 2.2)
+        bob_x = 0.04 * math.cos(f * 1.1)
+        cam.location = (bob_x, wy, Z_FLR + 1.6 + bob_z)
+        target.location = (bob_x * 0.5, wy + 30.0, Z_FLR + 1.5)
+        cam.keyframe_insert('location', frame=f)
+        target.keyframe_insert('location', frame=f)
+
+        for l_obj, l_idx in flicker_lights:
+            flk = math.sin(f * 2.4 + l_idx * 4.1)
+            scale_z = 0.12 if flk > -0.20 else 0.001
+            l_obj.scale = (1.2, 3.5, scale_z)
+            l_obj.keyframe_insert('scale', frame=f)
+
 elif scene_type == "story":
     # =========================================================================
     # CONTINUOUS 3D MULTI-ALTITUDE STORY WORLD
@@ -5841,7 +6943,7 @@ if fx_mode == "fov_zoom":
 
 # 2. Compositor Post-Processing Nodes (bpy.types.CompositorNode*) & Volumetric/Atmospheric FX
 has_spaceship_scene = (scene_type == "spaceships") or (scene_type == "space" and space_mode in (6, 7, 8))
-needs_engine_bloom = has_spaceship_scene or (fx_mode == "bloom_glare") or is_starfield_warp or (scene_type == "trippy")
+needs_engine_bloom = has_spaceship_scene or (fx_mode == "bloom_glare") or is_starfield_warp or (scene_type in ("trippy", "op_art", "doom"))
 needs_layer_comp = (len(celestial_col.objects) > 0 and len(foreground_col.objects) > 0)
 
 if needs_layer_comp or needs_engine_bloom or fx_mode in (
@@ -6113,6 +7215,30 @@ if needs_layer_comp or needs_engine_bloom or fx_mode in (
 
                 ld = ng.nodes.new('CompositorNodeLensdist')
                 _safe_lensdist(ld, distortion=0.10, dispersion=0.03, fit=True)
+                ng.links.new(cur_img, ld.inputs['Image'])
+                cur_img = ld.outputs['Image']
+
+            elif scene_type == "op_art":
+                # Op-Art optical bloom / glow & crisp optical distortion
+                g_bloom = ng.nodes.new('CompositorNodeGlare')
+                _safe_glare(g_bloom, glare_type='Bloom', quality='High', threshold=0.45, strength=0.40, size=0.50)
+                ng.links.new(cur_img, g_bloom.inputs['Image'])
+                cur_img = g_bloom.outputs['Image']
+
+                ld = ng.nodes.new('CompositorNodeLensdist')
+                _safe_lensdist(ld, distortion=0.05, dispersion=0.04, fit=True)
+                ng.links.new(cur_img, ld.inputs['Image'])
+                cur_img = ld.outputs['Image']
+
+            elif scene_type == "doom":
+                # Retro 90s idTech CRT gaming monitor styling
+                g_bloom = ng.nodes.new('CompositorNodeGlare')
+                _safe_glare(g_bloom, glare_type='Bloom', quality='High', threshold=0.28, strength=0.45, size=0.55)
+                ng.links.new(cur_img, g_bloom.inputs['Image'])
+                cur_img = g_bloom.outputs['Image']
+
+                ld = ng.nodes.new('CompositorNodeLensdist')
+                _safe_lensdist(ld, distortion=0.08, dispersion=0.04, fit=True)
                 ng.links.new(cur_img, ld.inputs['Image'])
                 cur_img = ld.outputs['Image']
 
@@ -6388,6 +7514,8 @@ def render_blender_clip(theme_name, clip_index, out_mp4_path, width=1920, height
     if "flatpak" in base_cmd:
         run_idx = base_cmd.index("run") if "run" in base_cmd else -1
         if run_idx != -1:
+            base_cmd.insert(run_idx + 1, "--filesystem=/tmp")
+            base_cmd.insert(run_idx + 1, "--filesystem=host")
             base_cmd.insert(run_idx + 1, "--env=MESA_GLTHREAD=false")
 
     # Primary hardware execution (multi-threaded Blender)

@@ -261,6 +261,9 @@ Pass one or more themes using `-themes "theme1,theme2"`:
 | `prismatic` | Iridescent bismuth hopper crystal terraces, faceted gemstone polyhedra, and rainbow chromatic dispersion flares. |
 | `quantum` | High-energy particle collisions, Lorentz magnetic deflection arcs, and vibrating subatomic probability wave lattices. |
 | `landscape` | Procedural fractal mountain canyons with dynamic aircraft banking S-turns and synthetic vision HUDs. |
+| `backrooms` | Liminal architecture: Level 0 "The Lobby" mono-yellow carpet maze, Level 2 "Pipe Dreams" industrial maintenance basement, serene submerged "Poolrooms", and sub-level tiled corridors. |
+| `op_art` | Hypnotic optical illusions: B&W diamond lattice wireframe tunnels (homage to *▲ Grid*), recursive stepped rainbow corridors with checkerboard floors (homage to *The Geometry of Insanity*), concentric hexagonal spirals, and moiré vortex stargates. Sci-fi cockpit overlays are automatically suppressed for pure visual immersion. |
+| `doom` | 1993 retro idTech 1 aesthetic across 4 level archetypes: Phobos E1M1 techbase courtyards (slime trenches, toxic waste barrels, exit blast doors, jagged mountain skies), acid vat refinery catwalks, Hell citadel pentagram halls with flaming skull cauldrons, and Deimos teleporter server banks. Includes a centered first-person double-barrel shotgun sprite and an authentic 1993 DOOM status bar HUD. |
 | `story` | Continuous 3D narrative: deep space cruise -> atmospheric re-entry dive -> canyon flight -> ground tank battle -> transcendence. |
 
 ---
@@ -281,7 +284,7 @@ Pass one or more themes using `-themes "theme1,theme2"`:
 | `-outvideo <path>` | Output video file (`.mp4`) | *(Required)* |
 | `-themes <list>` | Comma-separated list of visual themes | `space` |
 | `-story [preset]` | Continuous story mode (`traveller`, `cyber`, `crystal`, `strike`) | `None` |
-| `-palette <name>` | Force UI colorway palette (`cyberpunk_neon`, `nostromo_amber`, `matrix_phosphor`, etc.) | Auto from MIDI |
+| `-palette <name>` | Force UI colorway palette (`cyberpunk_neon`, `nostromo_amber`, `matrix_phosphor`, `doom`, `op_art`, `toxic_acid`, etc.) | Auto from MIDI |
 | `-piano-dir <dir>` | Force piano roll scroll direction (`up`, `down`, `left`, `right`) | Auto from MIDI |
 | `-platform <name>` | Platform preset: `youtube` (1080p), `tiktok` / `shorts` (vertical 9:16), `retro` (320x200) | `None` |
 | `-size <WxH>` | Custom output resolution (e.g. `1920x1080`, `1280x720`) | `1920x1080` |

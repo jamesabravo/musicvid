@@ -401,6 +401,66 @@ THEME_CATALOG: List[ThemeProfile] = [
         ],
         marker_font_color="0xffd700",
     ),
+    ThemeProfile(
+        id="doom",
+        name="Doom E1M1",
+        font_name="Liberation Mono",
+        hud_primary_ass="&H1038FF28",      # Toxic Green #28FF38
+        hud_outline_ass="&H88041A04",
+        hud_back_ass="&HA0041A04",
+        midi_primary_ass="&H103820FF",     # Blood Crimson #FF2038
+        midi_outline_ass="&H88060322",
+        midi_back_ass="&HA0060322",
+        hud_border_color="0x28ff38@0.55",
+        waveform_colors="0x880010|0x28ff38",
+        waveform_playhead_color="0xffffff@0.95",
+        waveform_border_color="0x28ff38@0.55",
+        spectrum_lut_style="acid_toxic",
+        spectrum_border_color="0x28ff38@0.55",
+        flight_hud_accent=(40, 255, 56, 160),
+        flight_hud_secondary=(255, 32, 56, 140),
+        piano_direction="up",
+        piano_kb_theme="classic",
+        piano_accent_line=(40, 255, 56, 235),
+        piano_palette=[
+            ((40, 255, 56, 225), (180, 255, 190, 255)),
+            ((255, 32, 56, 225), (255, 170, 180, 255)),
+            ((255, 180, 0, 225), (255, 230, 150, 255)),
+            ((20, 180, 50, 225), (140, 255, 170, 255)),
+            ((180, 10, 30, 225), (255, 120, 140, 255)),
+        ],
+        marker_font_color="0x28ff38",
+    ),
+    ThemeProfile(
+        id="op_art",
+        name="Op-Art Illusion",
+        font_name="Liberation Mono",
+        hud_primary_ass="&H10FFFFFF",      # Pure Stark White #FFFFFF
+        hud_outline_ass="&H88050505",
+        hud_back_ass="&HA0050505",
+        midi_primary_ass="&H10D0D0D0",     # Chrome Silver #D0D0D0
+        midi_outline_ass="&H88080808",
+        midi_back_ass="&HA0080808",
+        hud_border_color="0xffffff@0.65",
+        waveform_colors="0x222222|0xffffff",
+        waveform_playhead_color="0xffffff@0.95",
+        waveform_border_color="0xffffff@0.65",
+        spectrum_lut_style="rainbow",
+        spectrum_border_color="0xffffff@0.65",
+        flight_hud_accent=(255, 255, 255, 180),
+        flight_hud_secondary=(200, 200, 200, 150),
+        piano_direction="up",
+        piano_kb_theme="classic",
+        piano_accent_line=(255, 255, 255, 235),
+        piano_palette=[
+            ((255, 255, 255, 225), (255, 255, 255, 255)),
+            ((255, 30, 130, 225), (255, 180, 220, 255)),
+            ((0, 230, 255, 225), (180, 250, 255, 255)),
+            ((255, 215, 0, 225), (255, 245, 180, 255)),
+            ((50, 255, 80, 225), (180, 255, 190, 255)),
+        ],
+        marker_font_color="0xffffff",
+    ),
 ]
 
 
@@ -452,7 +512,7 @@ def _interpolate_stops(fx: float, stops: List[Tuple[float, Tuple[int, int, int]]
     return stops[-1][1]
 
 
-def create_spectrum_lut_png(width: int, height: int, out_path: str, style: str = "rainbow", win_size: int = 512) -> str:
+def create_spectrum_lut_png(width: int, height: int, out_path: str, style: str = "rainbow", win_size: int = 256) -> str:
     """
     Creates a vibrant 2D colormap PNG for the spectrum analyzer bars with smooth color gradients,
     peak brightness scaling near the top (y -> 0), and thin vertical black separator lines after each frequency bin.

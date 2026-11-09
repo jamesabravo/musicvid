@@ -125,9 +125,13 @@ def main():
 
         # Derive cohesive visual theme and deterministic master seed from MIDI
         master_seed = args.seed if args.seed is not None else midi_analysis.seed
+        palette_override = args.palette
+        active_themes = getattr(args, "theme_list", None) or ([t.strip() for t in args.themes.split(",") if t.strip()] if args.themes else [])
+        if palette_override is None and len(active_themes) == 1:
+            palette_override = active_themes[0]
         theme_profile = get_theme_profile(
             seed=master_seed,
-            override_palette=args.palette,
+            override_palette=palette_override,
             override_direction=args.piano_dir
         )
         print(f"[*] MIDI Fingerprint: {midi_analysis.midi_hash[:12]}... (Master Seed: {master_seed})")

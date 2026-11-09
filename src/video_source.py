@@ -48,6 +48,10 @@ def slugify(text):
         return "story"
     if any(k in tl for k in ("backrooms", "backroom", "liminal", "vhs", "found_footage", "yellow_rooms")):
         return "backrooms"
+    if any(k in tl for k in ("doom", "e1m1", "hell", "nukage", "idtech", "techbase", "demon")):
+        return "doom"
+    if any(k in tl for k in ("op_art", "opart", "grid_tunnel", "insanity", "geometry_insanity", "bw_grid", "optical", "grid")):
+        return "op_art"
     if any(k in tl for k in ("trippy", "psychedelic", "acid", "kaleidoscope", "mandala", "vortex")):
         return "trippy"
     if any(k in tl for k in ("synthwave", "outrun", "retrowave", "neon_grid", "cybergrid")):

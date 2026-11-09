@@ -71,6 +71,34 @@ TERRAIN_OSD_TEMPLATES = [
     "[SVS_VECTOR] TERRAIN FOLLOWING AP: ACTIVE // CONTOUR ENVELOPE: 3.0 m",
 ]
 
+DOOM_TELEMETRY_TEMPLATES = [
+    "[UAC_SYS] PHOBOS RESEARCH ANOMALY // DEFENSE MATRIX LOCKED",
+    "SECTOR: E1M1 HANGAR // RADAR BIO-SIGNALS: NOMINAL",
+    "UAC BIO-LAB: TOXIC NUKAGE VAT INTEGRITY AT 99.4%",
+    "ARMOR: STANDARD SECURITY PRAETOR VEST // CHARGE: 100%",
+    "BFG-9000 CAPACITOR SPOOL: STANDBY // PLASMA CELLS: READY",
+    "RADIATION SHIELDING: ACTIVE (NUKAGE DISPERSAL OK)",
+    "UAC MIL-SPEC FIRMWARE V1.993 // CPU: 486-DX2/66 MHz",
+    "WARNING: UNREGISTERED HELLSPAWN TELEPORTATION EVENT",
+    "DEIMOS TELEPORT GATEWAY STABILIZATION COILS: 98.7%",
+    "AUTOMAP TELEMETRY: ALL CLEARANCES GRANTED (BLUE/YELLOW/RED)",
+    "AMMUNITION SURPLUS: 12-GAUGE BUCKSHOT / 50-CAL CLIP READY",
+    "TARGET_ACQUISITION: CYBERDEMON RADAR COORD LOCKED",
+]
+
+OP_ART_TELEMETRY_TEMPLATES = [
+    "[OP_ART] OPTICAL LATTICE TUNNEL // VANISHING POINT LOCKED",
+    "FOCAL VECTOR: PERSPECTIVE CONVERGENCE [0.00, 0.00, 0.00]",
+    "GEOMETRIC RESONANCE: 12-POINT OCTAGONAL RECURSIVE MATRIX",
+    "DIFFRACTION FREQUENCY: 432 Hz // OPTICAL SYMMETRY: D6",
+    "CHROMATIC DISPERSION: SPECTRAL BAND HARMONICS SYNCHRONIZED",
+    "MOIRÉ INTERFERENCE PATTERN: FRINGE SEPARATION 0.14 mm",
+    "RECURSIVE PORTAL APERTURE: INFINITE FOCAL DEPTH",
+    "PSYCHEDELIC KALEIDOSCOPIC FLOW: 60 FPS DETERMINISTIC GLIDE",
+    "CHECKERBOARD SPATIAL MANIFOLD // HIGH-CONTRAST MONOCHROME",
+    "OPTICAL ILLUSION VECTORS: NEURAL RETINAL ENTANGLEMENT OK",
+]
+
 def _format_ass_time(seconds):
     s = max(0.0, float(seconds))
     h = int(s // 3600)
@@ -498,23 +526,35 @@ def build_spaceship_hud_ass(timeline, total_dur, ass_path, midi_analysis=None, t
         if t_e <= t_s + 0.35:
             continue
 
+        win_theme = str(win.get("theme", "")).lower()
+        prof_id = getattr(theme_profile, "id", "").lower()
+        is_doom = any(k in win_theme for k in ("doom", "e1m1", "hell", "nukage", "idtech", "techbase", "demon")) or (prof_id == "doom")
+        is_op_art = any(k in win_theme for k in ("op_art", "opart", "grid_tunnel", "insanity", "geometry_insanity", "bw_grid", "optical", "grid")) or (prof_id == "op_art")
+        is_landscape = any(k in win_theme for k in ("landscape", "terrain", "fractal", "canyon", "mountain", "valley", "svs"))
+
         # 1. Spaceship / Terrain OSD Telemetry HUD
         corner = win.get("hud_corner") or ""
         if corner:
             scroll_mode = rng.choice([True, False])
             style_name = f"HUD_{corner}"
 
-            is_landscape = any(k in str(win.get("theme", "")).lower() for k in ("landscape", "terrain", "fractal", "canyon", "mountain", "valley", "svs"))
             cfg = get_config()
             overlays_cfg = cfg.get("overlays", {})
-            active_templates = overlays_cfg.get("terrain_osd", TERRAIN_OSD_TEMPLATES) if is_landscape else overlays_cfg.get("spaceship_telemetry", SPACESHIP_HUD_TEMPLATES)
+            if is_doom:
+                active_templates = overlays_cfg.get("doom_telemetry", DOOM_TELEMETRY_TEMPLATES)
+            elif is_op_art:
+                active_templates = overlays_cfg.get("op_art_telemetry", OP_ART_TELEMETRY_TEMPLATES)
+            elif is_landscape:
+                active_templates = overlays_cfg.get("terrain_osd", TERRAIN_OSD_TEMPLATES)
+            else:
+                active_templates = overlays_cfg.get("spaceship_telemetry", SPACESHIP_HUD_TEMPLATES)
             cur_n_templates = len(active_templates)
 
             # Bounding box with random color and dimmed semitranslucent background
             hud_bw = 640
             hud_bh = 140
             hud_bx = 20 if "L" in corner else (1920 - 20 - hud_bw)
-            hud_by = 16 if "T" in corner else (1080 - 16 - hud_bh)
+            hud_by = 16 if "T" in corner else (1080 - 16 - hud_bh - (int(1080 * 0.135) if is_doom else 0))
             hud_box_col = rng.choice(CYBER_BORDER_BGR)
             ass_lines.append(
                 f"Dialogue: 0,{_format_ass_time(t_s)},{_format_ass_time(t_e)},CardBox,,0,0,0,,{{\\pos({hud_bx},{hud_by})\\bord1\\3c&H{hud_box_col}&\\3a&H00&\\1a&H50&\\1c&H120805&\\p1}}m 0 0 l {hud_bw} 0 l {hud_bw} {hud_bh} l 0 {hud_bh}{{\\p0}}"
@@ -605,7 +645,7 @@ def build_spaceship_hud_ass(timeline, total_dur, ass_path, midi_analysis=None, t
             p_bw = 520
             p_bh = 360
             p_bx = 20 if "L" in p_corner else (1920 - 20 - p_bw)
-            p_by = 16 if "T" in p_corner else (1080 - 16 - p_bh)
+            p_by = 16 if "T" in p_corner else (1080 - 16 - p_bh - (int(1080 * 0.135) if is_doom else 0))
             p_box_col = rng.choice(CYBER_BORDER_BGR)
             ass_lines.append(
                 f"Dialogue: 0,{_format_ass_time(t_s)},{_format_ass_time(t_e)},CardBox,,0,0,0,,{{\\pos({p_bx},{p_by})\\bord1\\3c&H{p_box_col}&\\3a&H00&\\1a&H50&\\1c&H120805&\\p1}}m 0 0 l {p_bw} 0 l {p_bw} {p_bh} l 0 {p_bh}{{\\p0}}"
@@ -635,7 +675,7 @@ def build_spaceship_hud_ass(timeline, total_dur, ass_path, midi_analysis=None, t
             m_bw = 420
             m_bh = 140
             m_bx = 20 if "L" in m_corner else (1920 - 20 - m_bw)
-            m_by = 16 if "T" in m_corner else (1080 - 16 - m_bh)
+            m_by = 16 if "T" in m_corner else (1080 - 16 - m_bh - (int(1080 * 0.135) if is_doom else 0))
             m_box_col = rng.choice(CYBER_BORDER_BGR)
             ass_lines.append(
                 f"Dialogue: 0,{_format_ass_time(t_s)},{_format_ass_time(t_e)},CardBox,,0,0,0,,{{\\pos({m_bx},{m_by})\\bord1\\3c&H{m_box_col}&\\3a&H00&\\1a&H50&\\1c&H120805&\\p1}}m 0 0 l {m_bw} 0 l {m_bw} {m_bh} l 0 {m_bh}{{\\p0}}"
@@ -660,7 +700,7 @@ def build_spaceship_hud_ass(timeline, total_dur, ass_path, midi_analysis=None, t
 
         # 3. Center Flight HUD Live Updating Telemetry (Variants 1, 2, 3 only - not for Cross Hairs 4)
         v_id = int(win.get("flight_hud") or 0)
-        if v_id in (1, 2, 3):
+        if v_id in (1, 2, 3) and not (is_doom or is_op_art):
             fh_step = 0.22
             cur_fht = t_s
             base_spd = {1: 25300, 2: 31840, 3: 19420}.get(v_id, 25300)
@@ -717,9 +757,9 @@ def build_spaceship_hud_ass(timeline, total_dur, ass_path, midi_analysis=None, t
         f.write("\n".join(ass_lines) + "\n")
     return ass_path
 
-def create_rainbow_lut_png(width, height, out_path, style="rainbow"):
+def create_rainbow_lut_png(width, height, out_path, style="rainbow", win_size=256):
     """Creates a vibrant 2D colormap PNG for the spectrum analyzer bars."""
-    return create_spectrum_lut_png(width, height, out_path, style=style)
+    return create_spectrum_lut_png(width, height, out_path, style=style, win_size=win_size)
 
 
 def create_piano_roll_assets(piano_w, piano_h, total_dur, midi_analysis, strip_path, kb_path,
@@ -790,7 +830,7 @@ def create_piano_roll_assets(piano_w, piano_h, total_dur, midi_analysis, strip_p
                 )
                 s_draw.rectangle([x0, y_top, x1, y_bot], fill=f_rgba, outline=border_col, width=1)
             scroll_x, scroll_y = "0", f"-{pps}*t"
-        else:  # down (waterfall / downward cascade from top keys)
+        else:  # down (horizontal keyboard at top, notes emerge and scroll downward below it)
             y_playhead = kb_h
             for (t_start, t_end, note, vel, ch) in note_spans:
                 if t_start > total_dur:
@@ -820,7 +860,7 @@ def create_piano_roll_assets(piano_w, piano_h, total_dur, midi_analysis, strip_p
 
         strip_img.save(strip_path, "PNG")
 
-        # Static keyboard overlay (always solid white and black keys)
+        # Static keyboard overlay
         kb_img = Image.new("RGBA", (piano_w, piano_h), (0, 0, 0, 0))
         k_draw = ImageDraw.Draw(kb_img)
         w_fill = (255, 255, 255, 255)
@@ -829,23 +869,24 @@ def create_piano_roll_assets(piano_w, piano_h, total_dur, midi_analysis, strip_p
         b_h = max(6, int(kb_h * 0.65))
 
         if direction == "up":
+            # Keyboard at bottom, facing upward towards playhead
             y_playhead = piano_h - kb_h
             y_front = piano_h - 1
             # 1. Solid continuous white key bed across the entire keyboard depth
             k_draw.rectangle([0, y_playhead, piano_w - 1, y_front], fill=w_fill)
-            # Octave background grid lines (faint)
+            # Octave background grid lines (faint) in note scrolling area above keyboard
             for n_val in range(min_note, max_note + 1):
                 if n_val % 12 == 0:
                     gx = int(round((n_val - min_note) * key_w_f))
                     k_draw.line([(gx, 0), (gx, y_playhead)], fill=(accent_line_col[0], accent_line_col[1], accent_line_col[2], 40), width=1)
-            # 2. Black keys at the playhead (where notes strike/emerge)
+            # 2. Black keys at the playhead
             for n_val in range(min_note, max_note + 1):
                 if (n_val % 12) in black_semitones:
                     kx0 = int(round((n_val - min_note) * key_w_f))
                     kx1 = max(kx0, int(round((n_val - min_note + 1) * key_w_f)) - 1)
                     k_draw.rectangle([kx0, y_playhead, kx1, y_playhead + b_h], fill=b_fill)
-            # 3. Clean divider lines between white keys (when key_w_f >= 3.0)
-            if key_w_f >= 3.0:
+            # 3. Clean divider lines between white keys (when key_w_f >= 2.0)
+            if key_w_f >= 2.0:
                 for n_val in range(min_note, max_note + 1):
                     s = n_val % 12
                     if s in (5, 0) and n_val > min_note:  # Natural boundaries without black key: E-F (5) and B-C (0)
@@ -856,29 +897,31 @@ def create_piano_roll_assets(piano_w, piano_h, total_dur, midi_analysis, strip_p
                         k_draw.line([(dx, y_playhead + b_h + 1), (dx, y_front)], fill=div_col, width=1)
             k_draw.line([(0, y_playhead), (piano_w - 1, y_playhead)], fill=accent_line_col, width=2)
         else:  # down
+            # Keyboard at top, facing right-side up (black keys at top y=0..b_h, white lips at bottom y=b_h+1..kb_h-1)
             y_playhead = kb_h
             # 1. Solid continuous white key bed across the entire keyboard depth
             k_draw.rectangle([0, 0, piano_w - 1, kb_h - 1], fill=w_fill)
+            # Octave background grid lines (faint) in note scrolling area below keyboard
             for n_val in range(min_note, max_note + 1):
                 if n_val % 12 == 0:
                     gx = int(round((n_val - min_note) * key_w_f))
                     k_draw.line([(gx, y_playhead), (gx, piano_h - 1)], fill=(accent_line_col[0], accent_line_col[1], accent_line_col[2], 40), width=1)
-            # 2. Black keys at the playhead (where notes strike/emerge)
+            # 2. Black keys at the top (hinge/fallboard side)
             for n_val in range(min_note, max_note + 1):
                 if (n_val % 12) in black_semitones:
                     kx0 = int(round((n_val - min_note) * key_w_f))
                     kx1 = max(kx0, int(round((n_val - min_note + 1) * key_w_f)) - 1)
-                    k_draw.rectangle([kx0, kb_h - 1 - b_h, kx1, kb_h - 1], fill=b_fill)
-            # 3. Clean divider lines between white keys (when key_w_f >= 3.0)
-            if key_w_f >= 3.0:
+                    k_draw.rectangle([kx0, 0, kx1, b_h], fill=b_fill)
+            # 3. Clean divider lines between white keys (when key_w_f >= 2.0)
+            if key_w_f >= 2.0:
                 for n_val in range(min_note, max_note + 1):
                     s = n_val % 12
                     if s in (5, 0) and n_val > min_note:  # Natural boundaries without black key: E-F (5) and B-C (0)
                         dx = int(round((n_val - min_note) * key_w_f))
                         k_draw.line([(dx, 0), (dx, kb_h - 1)], fill=div_col, width=1)
-                    elif s in black_semitones:  # Front lip boundary (y=0 down to black key)
+                    elif s in black_semitones:  # Front lip boundary below black key
                         dx = int(round((n_val - min_note + 0.5) * key_w_f))
-                        k_draw.line([(dx, 0), (dx, kb_h - 2 - b_h)], fill=div_col, width=1)
+                        k_draw.line([(dx, b_h + 1), (dx, kb_h - 1)], fill=div_col, width=1)
             k_draw.line([(0, y_playhead), (piano_w - 1, y_playhead)], fill=accent_line_col, width=2)
 
         kb_img.save(kb_path, "PNG")
@@ -890,7 +933,8 @@ def create_piano_roll_assets(piano_w, piano_h, total_dur, midi_analysis, strip_p
         num_keys = max_note - min_note + 1
         key_h_f = piano_h / float(num_keys)
         bar_h = max(2, int(round(key_h_f * 1.15)))
-        kb_w = max(14, int(piano_w * 0.22))
+        # Keys about half original size (0.11 instead of 0.22)
+        kb_w = max(14, int(round(piano_w * 0.11)))
 
         pps = max(18, min(int(piano_w * 0.55), int(26000 / max(1.0, total_dur))))
         strip_h = piano_h
@@ -983,8 +1027,8 @@ def create_piano_roll_assets(piano_w, piano_h, total_dur, midi_analysis, strip_p
                     ky0 = int(round(piano_h - (k_idx + 1) * key_h_f))
                     ky1 = max(ky0, int(round(piano_h - k_idx * key_h_f)) - 1)
                     k_draw.rectangle([x_playhead, ky0, x_playhead + b_w, ky1], fill=b_fill)
-            # 3. Clean divider lines between white keys (when key_h_f >= 3.0)
-            if key_h_f >= 3.0:
+            # 3. Clean divider lines between white keys (when key_h_f >= 2.0)
+            if key_h_f >= 2.0:
                 for n_val in range(min_note, max_note + 1):
                     s = n_val % 12
                     k_idx = n_val - min_note
@@ -1011,8 +1055,8 @@ def create_piano_roll_assets(piano_w, piano_h, total_dur, midi_analysis, strip_p
                     ky0 = int(round(piano_h - (k_idx + 1) * key_h_f))
                     ky1 = max(ky0, int(round(piano_h - k_idx * key_h_f)) - 1)
                     k_draw.rectangle([kb_w - 1 - b_w, ky0, kb_w - 1, ky1], fill=b_fill)
-            # 3. Clean divider lines between white keys (when key_h_f >= 3.0)
-            if key_h_f >= 3.0:
+            # 3. Clean divider lines between white keys (when key_h_f >= 2.0)
+            if key_h_f >= 2.0:
                 for n_val in range(min_note, max_note + 1):
                     s = n_val % 12
                     k_idx = n_val - min_note
@@ -1027,11 +1071,13 @@ def create_piano_roll_assets(piano_w, piano_h, total_dur, midi_analysis, strip_p
         kb_img.save(kb_path, "PNG")
         return scroll_x, scroll_y
 
-def build_corner_overlay_exprs(timeline, corner_key, total_dur, pad_x, pad_y, max_overlay_time=None):
+def build_corner_overlay_exprs(timeline, corner_key, total_dur, pad_x, pad_y_top, pad_y_bot=None, max_overlay_time=None):
     """
     Builds x, y, and enable expressions to position a visualizer widget in its assigned corner
     across all 1/2, 1/4, or 1/8 clip sub-windows, coalescing consecutive windows in the same corner.
     """
+    if pad_y_bot is None:
+        pad_y_bot = pad_y_top
     merged = []
     for _, win, t_s, t_e in iter_overlay_windows(timeline, total_dur, max_time=max_overlay_time):
         c = win.get(corner_key) or ""
@@ -1059,7 +1105,7 @@ def build_corner_overlay_exprs(timeline, corner_key, total_dur, pad_x, pad_y, ma
     right_expr = "+".join(right_clauses) if right_clauses else "0"
     bot_expr = "+".join(bot_clauses) if bot_clauses else "0"
     x_expr = f"if({right_expr},W-w-{pad_x},{pad_x})"
-    y_expr = f"if({bot_expr},H-h-{pad_y},{pad_y})"
+    y_expr = f"if({bot_expr},H-h-{pad_y_bot},{pad_y_top})"
     return x_expr, y_expr, en_expr
 
 
@@ -1277,6 +1323,270 @@ def _load_hud_font(size):
             except Exception:
                 pass
     return ImageFont.load_default()
+
+
+def create_doom_status_bar_png(video_w, video_h, out_path, beat_time=0.0):
+    """
+    Renders an authentic 1993 DOOM status bar banner along the bottom edge,
+    complete with centered first-person double-barrel shotgun sprite:
+      - Centered double-barrel shotgun pointing forward above the HUD
+      - Beveled industrial slate stone base with 3D shadow/highlight bevels
+      - AMMO, HEALTH, ARMOR in segmented digital red LED numbers
+      - ARMS (2 3 4 5 6 7) and colored keycards (Blue, Yellow, Red)
+      - Center retro Doomguy mugshot pixel art with beat-reactive glance
+    """
+    sb_h = max(24, (int(video_h * 0.125) // 2) * 2)
+    gun_h = max(36, int(video_h * 0.22))
+    total_h = sb_h + gun_h
+    img = Image.new("RGBA", (video_w, total_h), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+
+    s = sb_h / 135.0
+    sb_offset_y = gun_h
+
+    # 1. First-Person DOOM II Super Shotgun Sprite (pointing directly in front towards horizon)
+    scale = max(1.0, video_h / 200.0)
+    cx = video_w // 2
+    base_y = gun_h
+    tip_y = max(4, int(gun_h * 0.14))
+    gun_w = max(38, int(video_w * 0.15))
+
+    w_base = gun_w
+    w_tip = max(18, int(gun_w * 0.46))
+
+    hb = w_base / 2.0
+    ht = w_tip / 2.0
+
+    # Wooden fore-end stock underneath the lower half of the barrels
+    stock_top_y = base_y - int((base_y - tip_y) * 0.58)
+    stock_w_top = int(w_tip * 1.10)
+    stock_w_base = int(w_base * 1.14)
+
+    # Dark wood shadow outline
+    draw.polygon([
+        (cx - stock_w_base/2.0 - 1.5, base_y),
+        (cx + stock_w_base/2.0 + 1.5, base_y),
+        (cx + stock_w_top/2.0 + 1, stock_top_y),
+        (cx - stock_w_top/2.0 - 1, stock_top_y),
+    ], fill=(36, 18, 8, 255))
+
+    # Walnut wood body
+    draw.polygon([
+        (cx - stock_w_base/2.0, base_y),
+        (cx + stock_w_base/2.0, base_y),
+        (cx + stock_w_top/2.0, stock_top_y),
+        (cx - stock_w_top/2.0, stock_top_y),
+    ], fill=(76, 40, 16, 255))
+
+    # Wood grain highlights on outer beveled edges
+    draw.line([
+        (cx - stock_w_base/2.0 + 0.5, base_y),
+        (cx - stock_w_top/2.0 + 0.5, stock_top_y)
+    ], fill=(120, 68, 28, 255), width=max(1, int(1.5 * scale)))
+    draw.line([
+        (cx + stock_w_base/2.0 - 0.5, base_y),
+        (cx + stock_w_top/2.0 - 0.5, stock_top_y)
+    ], fill=(128, 74, 32, 255), width=max(1, int(1.5 * scale)))
+
+    # Double Gun Barrels
+    rib_w_base = max(2.0, w_base * 0.08)
+    rib_w_tip = max(1.5, w_tip * 0.08)
+
+    b_l_out_base = cx - hb
+    b_l_in_base  = cx - rib_w_base / 2.0
+    b_l_out_tip  = cx - ht
+    b_l_in_tip   = cx - rib_w_tip / 2.0
+
+    strips_left = [
+        (0.00, 0.12, (20, 22, 26)),
+        (0.12, 0.30, (44, 48, 55)),
+        (0.30, 0.58, (120, 128, 140)),
+        (0.58, 0.68, (148, 156, 170)),
+        (0.68, 0.85, (50, 55, 64)),
+        (0.85, 1.00, (18, 20, 24)),
+    ]
+    for f0, f1, col in strips_left:
+        x0_b = b_l_out_base + f0 * (b_l_in_base - b_l_out_base)
+        x1_b = b_l_out_base + f1 * (b_l_in_base - b_l_out_base)
+        x0_t = b_l_out_tip + f0 * (b_l_in_tip - b_l_out_tip)
+        x1_t = b_l_out_tip + f1 * (b_l_in_tip - b_l_out_tip)
+        draw.polygon([(x0_b, base_y), (x1_b, base_y), (x1_t, tip_y), (x0_t, tip_y)], fill=(*col, 255))
+
+    # Center rib between the barrels
+    draw.polygon([
+        (cx - rib_w_base/2.0, base_y),
+        (cx + rib_w_base/2.0, base_y),
+        (cx + rib_w_tip/2.0, tip_y),
+        (cx - rib_w_tip/2.0, tip_y),
+    ], fill=(14, 16, 20, 255))
+    draw.line([(cx, base_y), (cx, tip_y)], fill=(48, 52, 60, 255), width=max(1, int(1 * scale)))
+
+    strips_right = [
+        (0.00, 0.15, (18, 20, 24)),
+        (0.15, 0.30, (48, 52, 60)),
+        (0.30, 0.42, (160, 170, 185)),
+        (0.42, 0.68, (128, 138, 150)),
+        (0.68, 0.86, (44, 48, 55)),
+        (0.86, 1.00, (20, 22, 26)),
+    ]
+    b_r_in_base  = cx + rib_w_base / 2.0
+    b_r_out_base = cx + hb
+    b_r_in_tip   = cx + rib_w_tip / 2.0
+    b_r_out_tip  = cx + ht
+    for f0, f1, col in strips_right:
+        x0_b = b_r_in_base + f0 * (b_r_out_base - b_r_in_base)
+        x1_b = b_r_in_base + f1 * (b_r_out_base - b_r_in_base)
+        x0_t = b_r_in_tip + f0 * (b_r_out_tip - b_r_in_tip)
+        x1_t = b_r_in_tip + f1 * (b_r_out_tip - b_r_in_tip)
+        draw.polygon([(x0_b, base_y), (x1_b, base_y), (x1_t, tip_y), (x0_t, tip_y)], fill=(*col, 255))
+
+    # Flat top muzzle crown pointing forward into the distance (flush cut, no chimney holes!)
+    crown_h = max(1, int(1.5 * scale))
+    draw.polygon([
+        (b_l_out_tip - 0.5, tip_y),
+        (b_r_out_tip + 0.5, tip_y),
+        (b_r_out_tip + 0.5, tip_y + crown_h),
+        (b_l_out_tip - 0.5, tip_y + crown_h)
+    ], fill=(30, 32, 38, 255))
+    draw.line([(b_l_out_tip, tip_y), (b_r_out_tip, tip_y)], fill=(75, 80, 90, 255), width=max(1, int(1 * scale)))
+
+    # Front sight bead (brass bead perched at the tip center between barrels)
+    bead_w = max(2.0, 2.5 * scale)
+    bead_h = max(3.0, 4.5 * scale)
+    draw.rectangle([cx - bead_w/2.0, tip_y - bead_h, cx + bead_w/2.0, tip_y], fill=(215, 175, 55, 255), outline=(100, 75, 20, 255))
+
+    # Breech block / receiver hinge at base
+    rec_h = max(2, int(3 * scale))
+    draw.polygon([
+        (cx - hb - 2, base_y),
+        (cx + hb + 2, base_y),
+        (cx + hb, base_y - rec_h),
+        (cx - hb, base_y - rec_h)
+    ], fill=(28, 30, 36, 255), outline=(65, 70, 80, 255))
+
+    # 2. Base slate stone panel with horizontal gradient banding
+    for y in range(sb_offset_y, total_h):
+        shade = int(56 + 8 * math.sin((y - sb_offset_y) * 0.8))
+        draw.line([(0, y), (video_w, y)], fill=(shade, shade - 2, shade - 4, 255))
+
+    # Top & bottom 3D beveled borders
+    draw.line([(0, sb_offset_y), (video_w, sb_offset_y)], fill=(120, 120, 115, 255), width=max(1, int(3 * s)))
+    draw.line([(0, total_h - 1), (video_w, total_h - 1)], fill=(20, 20, 20, 255), width=max(1, int(3 * s)))
+
+    comp_defs = [
+        ("ammo", 0.02, 0.18),
+        ("health", 0.20, 0.40),
+        ("face", 0.42, 0.58),
+        ("armor", 0.60, 0.80),
+        ("arms", 0.82, 0.98),
+    ]
+
+    comp_rects = {}
+    for name, x0_pct, x1_pct in comp_defs:
+        cx0 = int(video_w * x0_pct)
+        cx1 = int(video_w * x1_pct)
+        cy0 = sb_offset_y + max(2, int(8 * s))
+        cy1 = total_h - max(2, int(8 * s))
+        comp_rects[name] = (cx0, cy0, cx1, cy1)
+
+        draw.rectangle([cx0, cy0, cx1, cy1], fill=(22, 22, 24, 255))
+        draw.line([(cx0, cy0), (cx1, cy0)], fill=(10, 10, 12, 255), width=max(1, int(2 * s)))
+        draw.line([(cx0, cy0), (cx0, cy1)], fill=(10, 10, 12, 255), width=max(1, int(2 * s)))
+        draw.line([(cx0, cy1), (cx1, cy1)], fill=(75, 75, 72, 255), width=max(1, int(2 * s)))
+        draw.line([(cx1, cy0), (cx1, cy1)], fill=(75, 75, 72, 255), width=max(1, int(2 * s)))
+
+    lbl_size = max(6, int(13 * s))
+    val_size = max(10, int(38 * s))
+    font_lbl = _load_hud_font(lbl_size)
+    font_val = _load_hud_font(val_size)
+
+    # 1. AMMO
+    ax0, ay0, ax1, ay1 = comp_rects["ammo"]
+    draw.text((ax0 + int(6 * s), ay0 + int(4 * s)), "AMMO", font=font_lbl, fill=(180, 160, 140, 255))
+    draw.text((ax0 + int(12 * s), ay0 + int(24 * s)), "200", font=font_val, fill=(225, 20, 20, 255))
+
+    # 2. HEALTH
+    hx0, hy0, hx1, hy1 = comp_rects["health"]
+    draw.text((hx0 + int(8 * s), hy0 + int(4 * s)), "HEALTH", font=font_lbl, fill=(180, 160, 140, 255))
+    draw.text((hx0 + int(16 * s), hy0 + int(24 * s)), "100%", font=font_val, fill=(225, 20, 20, 255))
+
+    # 3. ARMOR
+    rx0, ry0, rx1, ry1 = comp_rects["armor"]
+    draw.text((rx0 + int(8 * s), ry0 + int(4 * s)), "ARMOR", font=font_lbl, fill=(180, 160, 140, 255))
+    draw.text((rx0 + int(16 * s), ry0 + int(24 * s)), "100%", font=font_val, fill=(225, 20, 20, 255))
+
+    # 4. ARMS & KEYS
+    mx0, my0, mx1, my1 = comp_rects["arms"]
+    draw.text((mx0 + int(6 * s), my0 + int(4 * s)), "ARMS 2 3 4 5 6 7", font=font_lbl, fill=(235, 185, 40, 255))
+    kw = int(14 * s)
+    kh = int(22 * s)
+    ky = my0 + int(28 * s)
+    draw.rectangle([mx0 + int(8 * s), ky, mx0 + int(8 * s) + kw, ky + kh], fill=(30, 90, 220, 255), outline=(180, 220, 255, 255))
+    draw.rectangle([mx0 + int(32 * s), ky, mx0 + int(32 * s) + kw, ky + kh], fill=(220, 180, 20, 255), outline=(255, 240, 180, 255))
+    draw.rectangle([mx0 + int(56 * s), ky, mx0 + int(56 * s) + kw, ky + kh], fill=(220, 30, 30, 255), outline=(255, 180, 180, 255))
+
+    # 5. DOOMGUY MUGSHOT PIXEL ART
+    fx0, fy0, fx1, fy1 = comp_rects["face"]
+    fw = fx1 - fx0
+    fh = fy1 - fy0
+    grid_w = 26
+    grid_h = 28
+    px_size = min(fw / float(grid_w), fh / float(grid_h)) * 0.90
+    ox = fx0 + (fw - grid_w * px_size) / 2.0
+    oy = fy0 + (fh - grid_h * px_size) / 2.0
+
+    eye_phase = int(beat_time * 2.0) % 3
+    pupil_offset = -1 if eye_phase == 0 else (1 if eye_phase == 2 else 0)
+
+    C_HAIR = (80, 50, 30, 255)
+    C_SKIN = (235, 175, 130, 255)
+    C_SHADOW = (185, 120, 85, 255)
+    C_WHITE = (245, 245, 245, 255)
+    C_PUPIL = (30, 30, 45, 255)
+    C_MOUTH = (140, 60, 55, 255)
+    C_ARMOR = (70, 85, 65, 255)
+
+    def draw_px(gx, gy, col):
+        x = ox + gx * px_size
+        y = oy + gy * px_size
+        draw.rectangle([x, y, x + px_size, y + px_size], fill=col)
+
+    for gy in range(grid_h):
+        for gx in range(grid_w):
+            if 2 <= gy <= 5 and 5 <= gx <= 20:
+                draw_px(gx, gy, C_HAIR)
+            elif 6 <= gy <= 7 and (5 <= gx <= 8 or 17 <= gx <= 20):
+                draw_px(gx, gy, C_HAIR)
+            elif 6 <= gy <= 19 and 6 <= gx <= 19:
+                if gy >= 17 and (gx <= 8 or gx >= 17):
+                    draw_px(gx, gy, C_SHADOW)
+                elif gy in (10, 11) and 7 <= gx <= 18:
+                    if gy == 10:
+                        draw_px(gx, gy, C_HAIR)
+                    elif gy == 11:
+                        if 9 <= gx <= 11:
+                            if gx == 10 + pupil_offset:
+                                draw_px(gx, gy, C_PUPIL)
+                            else:
+                                draw_px(gx, gy, C_WHITE)
+                        elif 14 <= gx <= 16:
+                            if gx == 15 + pupil_offset:
+                                draw_px(gx, gy, C_PUPIL)
+                            else:
+                                draw_px(gx, gy, C_WHITE)
+                        else:
+                            draw_px(gx, gy, C_SKIN)
+                elif gy == 14 and 11 <= gx <= 14:
+                    draw_px(gx, gy, C_SHADOW)
+                elif gy == 17 and 10 <= gx <= 15:
+                    draw_px(gx, gy, C_MOUTH)
+                else:
+                    draw_px(gx, gy, C_SKIN)
+            elif 20 <= gy <= 26 and 4 <= gx <= 21:
+                draw_px(gx, gy, C_ARMOR)
+
+    img.save(out_path, "PNG")
+    return video_w, total_h
 
 
 def create_flight_hud_png(hud_w, hud_h, variant, out_path, accent_primary=None, accent_secondary=None):
@@ -1787,13 +2097,23 @@ class FxCompositor:
                 filter_chains.append(f"{current_v}ass='{hud_ass_path}'[hud_debug]")
                 current_v = "[hud_debug]"
 
+                is_doom_active = (getattr(theme_profile, "id", "").lower() in ("doom", "e1m1", "hell", "nukage")) or any(
+                    str(seg.get("theme", seg.get("assigned_theme", ""))).lower() in ("doom", "e1m1", "hell", "nukage") for seg in timeline
+                )
+                is_op_art_active = (getattr(theme_profile, "id", "").lower() in ("op_art", "opart")) or any(
+                    str(seg.get("theme", seg.get("assigned_theme", ""))).lower() in ("op_art", "opart") for seg in timeline
+                )
+
                 # 6b. Random Center Flight HUDs (half size, darker/half-transparent) with Realistic Horizon Line
                 fh_w = max(80, (int(self.width * 0.28) // 2) * 2)
                 fh_h = max(60, (int(self.height * 0.34) // 2) * 2)
                 fh_line_h = max(10, (int(fh_h * 0.08) // 2) * 2)
                 fh_var_exprs, fh_any_expr = build_flight_hud_enable_exprs(timeline, total_dur, max_overlay_time=credits_start)
 
-                has_any_center_overlay = (fh_any_expr != "0") or any(fh_var_exprs.get(v, "0") != "0" for v in (1, 2, 3, 4))
+                has_any_center_overlay = (
+                    not is_doom_active and not is_op_art_active and
+                    ((fh_any_expr != "0") or any(fh_var_exprs.get(v, "0") != "0" for v in (1, 2, 3, 4)))
+                )
                 if has_any_center_overlay:
                     for v_id in (1, 2, 3, 4):
                         v_en = fh_var_exprs.get(v_id, "0")
@@ -1827,6 +2147,19 @@ class FxCompositor:
                         )
                         current_v = "[v_fh_line]"
 
+                # 6c. Classic 1993 DOOM Status Bar (if in DOOM mode)
+                is_doom_active = (getattr(theme_profile, "id", "").lower() in ("doom", "e1m1", "hell", "nukage")) or any(
+                    str(seg.get("theme", seg.get("assigned_theme", ""))).lower() in ("doom", "e1m1", "hell", "nukage") for seg in timeline
+                )
+                if is_doom_active:
+                    doom_sb_path = os.path.join(tmpdir, "doom_status_bar.png")
+                    create_doom_status_bar_png(self.width, self.height, doom_sb_path)
+                    filter_chains.append(
+                        f"movie='{doom_sb_path}',format=rgba,loop=-1:1:0,setpts=N/({self.fps}*TB)[doom_sb_src];"
+                        f"{current_v}[doom_sb_src]overlay=x=0:y=H-h:format=auto[v_doom_sb]"
+                    )
+                    current_v = "[v_doom_sb]"
+
             # 7. Corner Visualizers (Smaller Colorful Spectrum Analyzer & Scrolling Playhead Waveform)
             if enable_visualizer:
                 p_dir = getattr(theme_profile, "piano_direction", "up")
@@ -1841,16 +2174,18 @@ class FxCompositor:
                 spec_h = max(34, (int(self.height * 0.11) // 2) * 2)
                 wave_w = max(72, (int(self.width * 0.22) // 2) * 2)
                 wave_h = max(32, (int(self.height * 0.10) // 2) * 2)
+                is_doom_mode = is_doom_active
                 pad_x = 8 if is_draft else 24
-                pad_y = 8 if is_draft else 22
+                pad_y_top = 8 if is_draft else 22
+                pad_y_bot = max(8, int(self.height * 0.135)) if is_doom_mode else (8 if is_draft else 22)
 
-                spec_x, spec_y, spec_en = build_corner_overlay_exprs(timeline, "spec_corner", total_dur, pad_x, pad_y, max_overlay_time=credits_start)
-                wave_x, wave_y, wave_en = build_corner_overlay_exprs(timeline, "wave_corner", total_dur, pad_x, pad_y, max_overlay_time=credits_start)
-                piano_x, piano_y, piano_en = build_corner_overlay_exprs(timeline, "piano_corner", total_dur, pad_x, pad_y, max_overlay_time=credits_start)
+                spec_x, spec_y, spec_en = build_corner_overlay_exprs(timeline, "spec_corner", total_dur, pad_x, pad_y_top, pad_y_bot, max_overlay_time=credits_start)
+                wave_x, wave_y, wave_en = build_corner_overlay_exprs(timeline, "wave_corner", total_dur, pad_x, pad_y_top, pad_y_bot, max_overlay_time=credits_start)
+                piano_x, piano_y, piano_en = build_corner_overlay_exprs(timeline, "piano_corner", total_dur, pad_x, pad_y_top, pad_y_bot, max_overlay_time=credits_start)
 
                 # Pre-render 2D LUT PNG for colorful spectrum analyzer
                 rainbow_path = os.path.join(tmpdir, "rainbow_lut.png")
-                create_spectrum_lut_png(spec_w, spec_h, rainbow_path, style=getattr(theme_profile, "spectrum_lut_style", "rainbow"))
+                create_spectrum_lut_png(spec_w, spec_h, rainbow_path, style=getattr(theme_profile, "spectrum_lut_style", "rainbow"), win_size=256)
 
                 # Pre-render full-song waveform strip PNG so it scrolls smoothly past the center playhead
                 wave_colors = getattr(theme_profile, "waveform_colors", "0x00ff88|0x00e5ff")
@@ -1889,7 +2224,7 @@ class FxCompositor:
                 freq_f = (
                     f"movie='{rainbow_path}',format=rgba,loop=-1:1:0,setpts=N/({self.fps}*TB)[spec_lut];"
                     f"[1:a]showfreqs=s={spec_w}x{spec_h}:r={self.fps}:mode=bar:ascale=cbrt:fscale=log:"
-                    f"win_size=512:colors=0xffffff|0xffffff,format=gray[spec_mask];"
+                    f"win_size=256:colors=0xffffff|0xffffff,format=gray[spec_mask];"
                     f"[spec_lut][spec_mask]alphamerge[spec_bars];"
                     f"color=c=0x050812@0.68:s={spec_w}x{spec_h}:r={self.fps},format=rgba[spec_bg];"
                     f"[spec_bg][spec_bars]overlay=0:0:format=auto,"

@@ -29,6 +29,8 @@ STORY_PRESETS = {
     "cyber":     ["starfield", "space", "synthwave", "tanks", "space_battle", "trippy"],
     "crystal":   ["starfield", "space", "landscape", "prismatic", "quantum", "trippy"],
     "strike":    ["spaceships", "space", "landscape", "tanks", "synthwave", "space_battle"],
+    "doom":      ["space", "landscape", "doom", "tanks", "doom", "trippy"],
+    "op_art":    ["starfield", "op_art", "synthwave", "op_art", "trippy", "quantum"],
 }
 
 def normalize_story_chapter(name):
@@ -36,6 +38,10 @@ def normalize_story_chapter(name):
     n = str(name or "").strip().lower()
     if n in ("backrooms", "backroom", "liminal", "vhs", "found_footage", "yellow_rooms"):
         return "backrooms"
+    if n in ("doom", "e1m1", "hell", "nukage", "idtech", "techbase", "demon"):
+        return "doom"
+    if n in ("op_art", "opart", "grid_tunnel", "insanity", "geometry_insanity", "bw_grid", "optical", "grid"):
+        return "op_art"
     if n in ("starfield", "starfield_warp", "warp", "hyperspace"):
         return "starfield"
     if n in ("space", "orbit", "planet", "descent", "orbital_descent"):
@@ -241,8 +247,8 @@ class CutScheduler:
                 is_section_start = True
             else:
                 assigned_theme = self.themes[i % len(self.themes)]
-                # Segments with the starfield warp acceleration clip or backrooms VHS explicitly use bloom_glare FX
-                is_warp_clip = (assigned_theme in ("starfield_warp", "backrooms")) or (assigned_theme == "space" and (unique_clip_index % 6 == 5))
+                # Segments with the starfield warp acceleration clip, backrooms VHS, doom, or op_art explicitly use bloom_glare FX
+                is_warp_clip = (assigned_theme in ("starfield_warp", "backrooms", "doom", "op_art")) or (assigned_theme == "space" and (unique_clip_index % 6 == 5))
                 if is_warp_clip:
                     assigned_blender_fx = "bloom_glare"
                     if "bloom_glare" in fx_candidates:
